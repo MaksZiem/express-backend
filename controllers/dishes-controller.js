@@ -469,3 +469,56 @@ exports.addTip = async (req, res, next) => {
         res.status(500).json({ message: 'Wystąpił błąd.' });
     }
 };
+
+exports.addDishToTableCart = async (req, res, next) => {
+    const { tableNumber, dishId, quantity } = req.body;
+  
+    try {
+      // Znalezienie stolika o podanym numerze
+      const table = await Table.findOne({ number: tableNumber });
+      if (!table) {
+        return res.status(404).json({ message: 'Stolik o podanym numerze nie istnieje.' });
+      }
+  
+      // Sprawdzenie, czy dany dishId już istnieje w koszyku
+      const existingDishIndex = table.dishCart.items.findIndex(item => item.dishId.toString() === dishId.toString());
+      if (existingDishIndex >= 0) {
+        // Jeśli istnieje, aktualizujemy ilość
+        table.dishCart.items[existingDishIndex].quantity += quantity;
+      } else {
+        // Jeśli nie istnieje, dodajemy nowy element do koszyka
+        table.dishCart.items.push({ dishId, quantity });
+      }
+  
+      // Zapisanie zmian w bazie danych
+      await table.save();
+  
+      res.status(200).json({ message: 'Danie zostało dodane do koszyka stolika.', dishCart: table.dishCart });
+    } catch (err) {
+      console.error('Błąd podczas dodawania dania do koszyka stolika:', err);
+      res.status(500).json({ message: 'Wystąpił błąd podczas aktualizacji koszyka stolika.' });
+    }
+  };
+
+  exports.removeDishFromTableCart = async (req, res, next) => {
+    const { tableNumber, dishId } = req.body;
+  
+    try {
+      // Znalezienie stolika o podanym numerze
+      const table = await Table.findOne({ number: tableNumber });
+      if (!table) {
+        return res.status(404).json({ message: 'Stolik o podanym numerze nie istnieje.' });
+      }
+  
+      // Usuwanie dania z koszyka
+      table.dishCart.items = table.dishCart.items.filter(item => item.dishId.toString() !== dishId.toString());
+  
+      // Zapisanie zmian w bazie danych
+      await table.save();
+  
+      res.status(200).json({ message: 'Danie zostało usunięte z koszyka stolika.', dishCart: table.dishCart });
+    } catch (err) {
+      console.error('Błąd podczas usuwania dania z koszyka stolika:', err);
+      res.status(500).json({ message: 'Wystąpił błąd podczas aktualizacji koszyka stolika.' });
+    }
+  };

@@ -17,7 +17,19 @@ const tableSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Order',
         default: null
-    }
+    },
+    dishCart: {
+        items: [
+          {
+            dishId: {
+              type: Schema.Types.ObjectId,
+              ref: 'Dish',
+              required: false
+            },
+            quantity: { type: Number, required: false }
+          }
+        ]
+      }
 });
 
 module.exports = mongoose.model('Table', tableSchema);

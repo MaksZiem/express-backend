@@ -21,7 +21,6 @@ exports.getAllIngredientTemplates = (req, res, next) => {
         });
 };
 
-
 exports.getIngredientsByName = async (req, res, next) => {
   const ingredientName = req.params.name; 
   const oneYearAgo = new Date();

@@ -31,4 +31,6 @@ router.patch('/:orderId/delivered', dishesController.markOrderAsDelivered)
 
 router.post('/add-tip', dishesController.addTip)
 
+router.post('/add-dish-to-table', dishesController.addDishToTableCart)
+
 module.exports = router;
