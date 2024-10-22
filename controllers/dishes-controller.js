@@ -65,7 +65,7 @@ exports.getDishById = async (req, res, next) => {
 
 
 
-exports.getDishesDashboard = (req, res, next) => {
+exports.getDishesDashboard2 = (req, res, next) => {
     req.user
       .populate('dishCart.items.dishId')
       .then(user => {
@@ -254,7 +254,9 @@ exports.deleteDish = async (req, res, next) => {
 }
 
 
-exports.postCreateOrder = (req, res, next) => {
+
+
+exports.postCreateOrder2 = (req, res, next) => {
     req.user
         .populate('dishCart.items.dishId')
         .then(async user => {
@@ -380,97 +382,96 @@ exports.getAllTables = async (req, res, next) => {
   };
 
 
-exports.getWaitingOrders = async (req, res, next) => {
-    try {
-       
-        const tablesWithWaitingOrders = await Table.find({ status: 'waiting' })
-            .populate({
-                path: 'order',
-                populate: {
-                    path: 'dishes.dish', 
-                    model: 'Dish'
-                }
-            });
+// exports.getWaitingOrders = async (req, res, next) => {
+//     try {
+//         const tablesWithWaitingOrders = await Table.find({ status: 'waiting' })
+//             .populate({
+//                 path: 'order',
+//                 populate: {
+//                     path: 'dishes.dish', 
+//                     model: 'Dish'
+//                 }
+//             });
     
        
-        if (!tablesWithWaitingOrders || tablesWithWaitingOrders.length === 0) {
-            return res.status(404).json({ message: "Nie znaleziono zamówień w statusie 'waiting'." });
-        }
+//         if (!tablesWithWaitingOrders || tablesWithWaitingOrders.length === 0) {
+//             return res.status(404).json({ message: "Nie znaleziono zamówień w statusie 'waiting'." });
+//         }
     
         
-        const waitingOrders = tablesWithWaitingOrders.map(table => table.order).filter(order => order !== null);
+//         const waitingOrders = tablesWithWaitingOrders.map(table => table.order).filter(order => order !== null);
     
-        res.status(200).json({
-            message: "Znaleziono zamówienia w statusie 'waiting'.",
-            orders: waitingOrders
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Wystąpił błąd podczas pobierania zamówień." });
-    }
-};
+//         res.status(200).json({
+//             message: "Znaleziono zamówienia w statusie 'waiting'.",
+//             orders: waitingOrders
+//         });
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).json({ message: "Wystąpił błąd podczas pobierania zamówień." });
+//     }
+// };
 
-  exports.markOrderAsDelivered = async (req, res, next) => {
-    try {
-        const orderId = req.params.orderId;
-        const order = await Order.findById(orderId);
+//   exports.markOrderAsDelivered = async (req, res, next) => {
+//     try {
+//         const orderId = req.params.orderId;
+//         const order = await Order.findById(orderId);
 
-        if (!order) {
-            return res.status(404).json({ message: 'Order not found.' });
-        }
+//         if (!order) {
+//             return res.status(404).json({ message: 'Order not found.' });
+//         }
 
-        console.log('wykonane')
-        const table = await Table.findOne({ order: orderId });
-        if (table) {
-            console.log(table.number)
-            table.status = 'delivered';
-            await table.save();
-        }
+//         console.log('wykonane')
+//         const table = await Table.findOne({ order: orderId });
+//         if (table) {
+//             console.log(table.number)
+//             table.status = 'delivered';
+//             await table.save();
+//         }
 
-        await order.save();
+//         await order.save();
 
-        res.status(200).json({ message: 'Order marked as delivered.' });
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({ message: 'An error occurred.' });
-    }
-};
+//         res.status(200).json({ message: 'Order marked as delivered.' });
+//     } catch (err) {
+//         console.log(err);
+//         res.status(500).json({ message: 'An error occurred.' });
+//     }
+// };
 
-exports.addTip = async (req, res, next) => {
-    const { amount, orderId } = req.body;
-    const userId = req.user._id;
+// exports.addTip = async (req, res, next) => {
+//     const { amount, orderId } = req.body;
+//     const userId = req.user._id;
 
-    try {
-        const order = await Order.findById(orderId);
-        if (!order) {
-            return res.status(404).json({ message: 'Zamówienie nie znalezione.' });
-        }
+//     try {
+//         const order = await Order.findById(orderId);
+//         if (!order) {
+//             return res.status(404).json({ message: 'Zamówienie nie znalezione.' });
+//         }
 
-        const tip = new Tip({
-            amount,
-            order: orderId,
-            user: userId
-        });
+//         const tip = new Tip({
+//             amount,
+//             order: orderId,
+//             user: userId
+//         });
 
-        await tip.save();
+//         await tip.save();
 
-        const table = await Table.findOne({ order: orderId });
-        if (table) {
-            table.status = 'free';
-            table.order = null; 
-            await table.save();
-        } else {
-            console.log('Stolik nie znaleziony.');
-        }
+//         const table = await Table.findOne({ order: orderId });
+//         if (table) {
+//             table.status = 'free';
+//             table.order = null; 
+//             await table.save();
+//         } else {
+//             console.log('Stolik nie znaleziony.');
+//         }
 
-        res.status(201).json({ message: 'Napiwek został dodany i status stolika zaktualizowany.', tip });
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({ message: 'Wystąpił błąd.' });
-    }
-};
+//         res.status(201).json({ message: 'Napiwek został dodany i status stolika zaktualizowany.', tip });
+//     } catch (err) {
+//         console.log(err);
+//         res.status(500).json({ message: 'Wystąpił błąd.' });
+//     }
+// };
 
-exports.addDishToTableCart = async (req, res, next) => {
+exports.addDishToTableCart1 = async (req, res, next) => {
     const { tableNumber, dishId, quantity } = req.body;
   
     try {
@@ -522,3 +523,67 @@ exports.addDishToTableCart = async (req, res, next) => {
       res.status(500).json({ message: 'Wystąpił błąd podczas aktualizacji koszyka stolika.' });
     }
   };
+
+//   exports.addDishToTableCart = async (req, res, next) => {
+//     const { tableNumber, dishId } = req.body;  // Usunięto "quantity" z req.body
+    
+//     try {
+//       // Znalezienie stolika o podanym numerze
+//       const table = await Table.findOne({ number: tableNumber });
+//       if (!table) {
+//         return res.status(404).json({ message: 'Stolik o podanym numerze nie istnieje.' });
+//       }
+  
+//       // Sprawdzenie, czy dany dishId już istnieje w koszyku
+//       const existingDishIndex = table.dishCart.items.findIndex(item => item.dishId.toString() === dishId.toString());
+//       if (existingDishIndex >= 0) {
+//         // Jeśli istnieje, aktualizujemy ilość, zwiększając o 1
+//         table.dishCart.items[existingDishIndex].quantity += 1;
+//       } else {
+//         // Jeśli nie istnieje, dodajemy nowy element do koszyka z quantity ustawionym na 1
+//         table.dishCart.items.push({ dishId, quantity: 1 });
+//       }
+  
+//       // Zapisanie zmian w bazie danych
+//       await table.save();
+  
+//       res.status(200).json({ message: 'Danie zostało dodane do koszyka stolika.', dishCart: table.dishCart });
+//     } catch (err) {
+//       console.error('Błąd podczas dodawania dania do koszyka stolika:', err);
+//       res.status(500).json({ message: 'Wystąpił błąd podczas aktualizacji koszyka stolika.' });
+//     }
+//   };
+  
+
+  exports.getTableCart = async (req, res, next) => {
+    const { tableNumber } = req.params; // Numer stolika przekazany jako parametr URL
+  
+    try {
+      // Znalezienie stolika o podanym numerze
+      const table = await Table.findOne({ number: tableNumber }).populate('dishCart.items.dishId');
+      if (!table) {
+        return res.status(404).json({ message: 'Stolik o podanym numerze nie istnieje.' });
+      }
+  
+      // Sprawdzenie, czy koszyk jest pusty
+      if (table.dishCart.items.length === 0) {
+        return res.status(200).json({ message: 'Koszyk stolika jest pusty.', dishCart: [] });
+      }
+  
+      // Zwrócenie koszyka stolika
+      res.status(200).json({
+        message: `Koszyk stolika nr ${tableNumber}:`,
+        dishCart: table.dishCart.items.map(item => ({
+          dish: item.dishId.name, // Wyświetla nazwę dania
+          quantity: item.quantity, // Ilość zamówionego dania
+          pricePerItem: item.dishId.price, // Cena za pojedyncze danie
+          totalPrice: item.dishId.price * item.quantity // Łączna cena za dane danie
+        }))
+      });
+    } catch (err) {
+      console.error('Błąd podczas pobierania koszyka stolika:', err);
+      res.status(500).json({ message: 'Wystąpił błąd podczas pobierania koszyka stolika.' });
+    }
+  };
+  
+  

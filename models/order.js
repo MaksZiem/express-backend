@@ -5,7 +5,8 @@ const Schema = mongoose.Schema;
 const orderSchema = new Schema({
     dishes: [{
         dish: {type: Object, required: true},
-        quantity: {type: Number, required: true}
+        quantity: {type: Number, required: true},
+        status: { type: String, enum: ['niegotowy', 'gotowy', 'wydane'], default: 'niegotowy' }
     }],
     user: {
         name: {
@@ -31,6 +32,30 @@ const orderSchema = new Schema({
         required: true
     }
 })
+
+// const mongoose = require('mongoose');
+// const Schema = mongoose.Schema;
+
+// const orderSchema = new Schema({
+//     user: {
+//         name: { type: String, required: true },
+//         userId: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+//     },
+//     dishes: [
+//         {
+//             dish: { type: Schema.Types.ObjectId, ref: 'Dish', required: true },
+//             quantity: { type: Number, required: true },
+//             status: { type: String, enum: ['niegotowy', 'gotowy'], default: 'niegotowy' }
+//         }
+//     ],
+//     price: { type: Number, required: true },
+//     orderDate: { type: String, required: true },
+//     addedDate: { type: String, required: true },
+//     tableNumber: { type: Number, required: true }
+// });
+
+// module.exports = mongoose.model('Order', orderSchema);
+
 
 // moze byc dobre
 // orderSchema.statics.getYearSummary = function () {

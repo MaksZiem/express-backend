@@ -9,6 +9,8 @@ const dishesRoutes = require('./routes/dishes-routes')
 const ingredientsRoutes = require('./routes/ingredients-routes')
 const statisticsRoutes = require('./routes/statistics-routes')
 const magazineRoutes = require('./routes/magazine-routes')
+const waiterRoutes = require('./routes/waiter-routes')
+const cookRoutes = require('./routes/cook-routes')
 const session = require('express-session');
 const MongoDBStore = require('connect-mongodb-session')(session);
 
@@ -47,7 +49,7 @@ app.use((req, res, next) => {
   User.findById('6585c2a7adafbe2c7251da99')
     .then(user => {
       req.user = user;
-      console.log(req.user)
+      // console.log(req.user)
       next();
     })
     .catch(err => console.log(err));
@@ -61,6 +63,8 @@ app.use('/api/dishes', dishesRoutes)
 app.use('/api/ingredients', ingredientsRoutes)
 app.use('/api/statistics', statisticsRoutes)
 app.use('/api/magazine', magazineRoutes)
+app.use('/api/waiter', waiterRoutes)
+app.use('/api/cook', cookRoutes )
 
 app.use((req, res, next) => {
     const error = new HttpError('Could not find this route', 404)
@@ -95,7 +99,7 @@ mongoose
           user.save();
         }
       });
-      app.listen(5000);
+      app.listen(8000);
 })
 .catch(err => {
     console.log(err)
