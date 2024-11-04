@@ -17,6 +17,8 @@ router.post('/add-to-cart', dishesController.addDishToCart)
 
 // router.post('/add-order', dishesController.postCreateOrder)
 
+router.get('/', dishesController.getDishes)
+
 router.patch('/:pid', dishesController.updateDish)
 
 router.delete('/:pid', dishesController.deleteDish)

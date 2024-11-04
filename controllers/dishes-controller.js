@@ -7,6 +7,21 @@ const Table = require('../models/table');
 const Tip = require('../models/tip')
 const mongoose = require('mongoose');
 
+exports.getDishes = async (req, res, next) => {
+  try {
+    const dishes = await Dish.find();
+
+    res.status(200).json({
+      dishes: dishes.map((dish) => dish.toObject({ getters: true })),
+    });
+  } catch (err) {
+    console.log(err);
+    return res
+      .status(500)
+      .json({ message: "Błąd podczas pobierania danych z koszyka stolika." });
+  }
+};
+
 exports.getOrdersByDishId = (req, res, next) => {
     const dishId = req.params.dishId;
 

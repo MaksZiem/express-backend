@@ -87,6 +87,7 @@ exports.createIngredientTemplate = async (req, res, next) => {
     const createdIngredientTemplate = new IngredientTemplate({
       name,
       category,
+      image: req.file.path,
       expirationDate: expirationDate, 
     });
   

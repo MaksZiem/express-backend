@@ -6,7 +6,12 @@ const orderSchema = new Schema({
     dishes: [{
         dish: {type: Object, required: true},
         quantity: {type: Number, required: true},
-        status: { type: String, enum: ['niegotowy', 'gotowy', 'wydane'], default: 'niegotowy' }
+        status: { type: String, enum: ['niegotowy', 'gotowy', 'wydane'], default: 'niegotowy' },
+        preparedBy: { type: Schema.Types.ObjectId, ref: 'User'}, // ID kucharza
+        doneByCookDate: {
+            type: String,
+            required: false
+        },
     }],
     user: {
         name: {
@@ -31,7 +36,7 @@ const orderSchema = new Schema({
         type: String,  
         required: true
     }
-})
+});
 
 // const mongoose = require('mongoose');
 // const Schema = mongoose.Schema;

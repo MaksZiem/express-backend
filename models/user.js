@@ -13,7 +13,14 @@ const userSchema = new Schema({
     required: true,
     unique: true
   },
-
+  password: { type: String, required: true, minlength: 6 },
+  pesel: { type: String, required: true, unique: true },
+  surname: { type: String, required: true },
+  image: { type: String, required: false },
+  role: {
+    type: String,
+    required: false
+  },
   dishCart: {
     items: [
       {

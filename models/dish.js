@@ -11,6 +11,7 @@ const dishSchema = new Schema ({
         type: Number,
         required: true
     },
+    image: { type: String, required: false },
     ingredientTemplates: [{
         ingredient: {
             type: Object,
