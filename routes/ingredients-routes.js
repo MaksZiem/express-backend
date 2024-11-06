@@ -6,9 +6,16 @@ const fileUpload = require('../middleware/file-upload')
 
 router.use(checkAuth)
 router.get('/', ingredientsController.getIngredientDashboard)
+
 router.delete('/delete-from-cart', ingredientsController.postDeleteIngredientFromCart)
+
 router.get('/weight-checkout', ingredientsController.getIngredientWeightCheckout)
+
 router.post('/add-to-cart', ingredientsController.postIngredientCart)
+
+router.delete('/delete-ingredient-template', ingredientsController.postDeleteIngredientTemplate)
+
+router.delete('/delete-ingredient', ingredientsController.postDeleteIngredient)
 
 router.post('/add-dish', fileUpload.single('image'), ingredientsController.postCreateDish)
 

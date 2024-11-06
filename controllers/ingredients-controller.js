@@ -1,52 +1,56 @@
-const HttpError = require('../models/http-error')
-const { validationResult } = require('express-validator')
-const Ingredient = require('../models/ingredient');
-const IngredientTemplate = require('../models/ingredientTemplate');
-const Dish = require('../models/dish')
-const jwt = require('jsonwebtoken');
-const User = require('../models/user'); // Twój model użytkownika
+const HttpError = require("../models/http-error");
+const { validationResult } = require("express-validator");
+const Ingredient = require("../models/ingredient");
+const IngredientTemplate = require("../models/ingredientTemplate");
+const Dish = require("../models/dish");
+const jwt = require("jsonwebtoken");
+const User = require("../models/user"); // Twój model użytkownika
 
-exports.getIngredientDashboard = (req,res,next) => {
-    const {category, name} = req.query;
-    // console.log('req.user ingredients: ' + req.userData.userId)
-    console.log('userData' + req.userData.userId)
-    req.user
-        .populate('ingredientCart.items.ingredientTemplateId')
-        .then(user => {
-            const cartIngredients = user.ingredientCart.items;
-            let filterCriteria = {};
+exports.getIngredientDashboard = (req, res, next) => {
+  const { category, name } = req.query;
+  // console.log('req.user ingredients: ' + req.userData.userId)
+  console.log("userData" + req.userData.userId);
+  req.user
+    .populate("ingredientCart.items.ingredientTemplateId")
+    .then((user) => {
+      const cartIngredients = user.ingredientCart.items;
+      let filterCriteria = {};
 
-            if (category && category !== 'all') {
-                filterCriteria.category = category;
-            }
+      if (category && category !== "all") {
+        filterCriteria.category = category;
+      }
 
-            if (name) {
-                filterCriteria.name = name;
-            }
+      if (name) {
+        filterCriteria.name = name;
+      }
 
-            let query = IngredientTemplate.find()
+      let query = IngredientTemplate.find();
 
-            if (Object.keys(filterCriteria).length > 0) {
-                query = IngredientTemplate.find(filterCriteria)
-            }
+      if (Object.keys(filterCriteria).length > 0) {
+        query = IngredientTemplate.find(filterCriteria);
+      }
 
-            query.then(ingredientTemplates => {
-                res.status(200).json({
-                    ingredientTemplates: ingredientTemplates.map(ingredientTemplates => ingredientTemplates.toObject({getters: true})),
-                    cartIngredients: cartIngredients.map(cartIngredients => cartIngredients.toObject({getters: true}))
-                })
-            })
-
-        }).catch(err => {
-            console.log(err)
-        })
-}
+      query.then((ingredientTemplates) => {
+        res.status(200).json({
+          ingredientTemplates: ingredientTemplates.map((ingredientTemplates) =>
+            ingredientTemplates.toObject({ getters: true })
+          ),
+          cartIngredients: cartIngredients.map((cartIngredients) =>
+            cartIngredients.toObject({ getters: true })
+          ),
+        });
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+};
 
 // exports.getIngredientDashboard = async (req, res, next) => {
 //     const { category, name } = req.query;
-  
+
 //     let user;
-    
+
 //     // Sprawdź, czy nagłówek autoryzacyjny zawiera token
 //     if (req.headers.authorization) {
 //       try {
@@ -64,26 +68,26 @@ exports.getIngredientDashboard = (req,res,next) => {
 //         console.log('Token decoding failed', err);
 //       }
 //     }
-  
+
 //     // Teraz możesz użyć req.user, jeśli użytkownik jest zalogowany
 //     if (req.user) {
 //       await req.user.populate('ingredientCart.items.ingredientTemplateId');
 //     }
-    
+
 //     const cartIngredients = req.user ? req.user.ingredientCart.items : [];
-  
+
 //     let filterCriteria = {};
-  
+
 //     if (category && category !== 'all') {
 //       filterCriteria.category = category;
 //     }
-  
+
 //     if (name) {
 //       filterCriteria.name = name;
 //     }
-  
+
 //     let query = IngredientTemplate.find(filterCriteria);
-  
+
 //     query.then(ingredientTemplates => {
 //       res.status(200).json({
 //         ingredientTemplates: ingredientTemplates.map(template =>
@@ -100,24 +104,27 @@ exports.getIngredientDashboard = (req,res,next) => {
 //   };
 
 exports.getIngredientWeightCheckout = (req, res, next) => {
-    const ingredientTemplateId = req.body.ingredientTemplateId;
-    IngredientTemplate.findById(ingredientTemplateId)
-        .then(ingredientTemplate => {
+  const ingredientTemplateId = req.body.ingredientTemplateId;
+  IngredientTemplate.findById(ingredientTemplateId)
+    .then((ingredientTemplate) => {
+      if (!ingredientTemplate) {
+        const error = HttpError(
+          "Could not find a ingredientTemplate for the provided id.",
+          404
+        );
+        return next(error);
+      }
 
-            if (!ingredientTemplate) {
-                const error = HttpError('Could not find a ingredientTemplate for the provided id.', 404);
-                return next(error)
-            }
-            
-            console.log("A" + ingredientTemplate)
+      console.log("A" + ingredientTemplate);
 
-            res.status(200).json({
-                ingredientTemplate: ingredientTemplate,
-                isAuthenticated: req.session.isLoggedIn
-            })
-        }).catch(err => {
-            console.log(err)
-        })
+      res.status(200).json({
+        ingredientTemplate: ingredientTemplate,
+        isAuthenticated: req.session.isLoggedIn,
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 };
 
 // exports.postIngredientCart = (req, res, next) => {
@@ -129,72 +136,129 @@ exports.getIngredientWeightCheckout = (req, res, next) => {
 //             return req.user.addIngredientToCart(ingredient, weight);
 //         })
 //         .then(result => {
-            
+
 //             res.status(200).json({message: "Dodano do koszyka"})
 //         });
 // };
 exports.postIngredientCart = (req, res, next) => {
-    console.log('Received data:', req.body); // Sprawdź, co przychodzi na backend
-    const ingredientTemplateId = req.body.ingredientTemplateId;
-    const weight = req.body.weight;
+  console.log("Received data:", req.body); // Sprawdź, co przychodzi na backend
+  const ingredientTemplateId = req.body.ingredientTemplateId;
+  const weight = req.body.weight;
 
-    if (!ingredientTemplateId || !weight) {
-        return res.status(400).json({message: "Brak wymaganych danych"});
-    }
+  if (!ingredientTemplateId || !weight) {
+    return res.status(400).json({ message: "Brak wymaganych danych" });
+  }
 
-    IngredientTemplate.findById(ingredientTemplateId)
-        .then(ingredient => {
-            if (!ingredient) {
-                throw new Error('Ingredient not found');
-            }
-            return req.user.addIngredientToCart(ingredient, weight);
-        })
-        .then(result => {
-            res.status(200).json({message: "Dodano do koszyka"});
-        })
-        .catch(err => {
-            console.error('Błąd dodawania do koszyka:', err);
-            res.status(500).json({message: "Błąd serwera"});
-        });
+  IngredientTemplate.findById(ingredientTemplateId)
+    .then((ingredient) => {
+      if (!ingredient) {
+        throw new Error("Ingredient not found");
+      }
+      return req.user.addIngredientToCart(ingredient, weight);
+    })
+    .then((result) => {
+      res.status(200).json({ message: "Dodano do koszyka" });
+    })
+    .catch((err) => {
+      console.error("Błąd dodawania do koszyka:", err);
+      res.status(500).json({ message: "Błąd serwera" });
+    });
 };
 
+exports.postDeleteIngredientTemplate = async (req, res, next) => {
+    try {
+      const prodId = req.body.ingredientTemplateId;
+  
+      // Sprawdzamy, czy ID zostało przekazane
+      if (!prodId) {
+        return res.status(400).json({ message: "ID ingredientTemplate jest wymagane." });
+      }
+  
+      // Usuwamy ingredientTemplate
+      const deletedTemplate = await IngredientTemplate.findOneAndDelete({ _id: prodId });
+  
+      // Sprawdzamy, czy element został znaleziony
+      if (!deletedTemplate) {
+        return res.status(404).json({ message: "IngredientTemplate nie znaleziono." });
+      }
+  
+      // Jeśli wszystko się udało
+      res.status(200).json({ message: "IngredientTemplate został pomyślnie usunięty." });
+  
+    } catch (error) {
+      // Obsługa błędów
+      console.error(error);
+      res.status(500).json({ message: "Wystąpił błąd podczas usuwania ingredientTemplate." });
+    }
+  };
+
+  exports.postDeleteIngredient = async (req, res, next) => {
+    try {
+      const prodId = req.body.ingredientId;
+  
+      // Sprawdzamy, czy ID zostało przekazane
+      if (!prodId) {
+        return res.status(400).json({ message: "ID ingredientTemplate jest wymagane." });
+      }
+  
+      // Usuwamy ingredientTemplate
+      const deletedTemplate = await Ingredient.findOneAndDelete({ _id: prodId });
+  
+      // Sprawdzamy, czy element został znaleziony
+      if (!deletedTemplate) {
+        return res.status(404).json({ message: "IngredientTemplate nie znaleziono." });
+      }
+  
+      // Jeśli wszystko się udało
+      res.status(200).json({ message: "IngredientTemplate został pomyślnie usunięty." });
+  
+    } catch (error) {
+      // Obsługa błędów
+      console.error(error);
+      res.status(500).json({ message: "Wystąpił błąd podczas usuwania ingredientTemplate." });
+    }
+  };
+  
 
 exports.postDeleteIngredientFromCart = (req, res, next) => {
-    const prodId = req.body.ingredientTemplateId;
-    req.user
-        .removeIngredientFromCart(prodId)
-        .then(result => {
-            res.status(200).json({message: "all is okay"})
-        })
-        .catch(err => console.log(err));
+  const prodId = req.body.ingredientTemplateId;
+  req.user
+    .removeIngredientFromCart(prodId)
+    .then((result) => {
+      res.status(200).json({ message: "all is okay" });
+    })
+    .catch((err) => console.log(err));
 };
 
 exports.postCreateDish = (req, res, next) => {
-    const name = req.body.name;
-    const price = req.body.price;
-    req.user
-        .populate('ingredientCart.items.ingredientTemplateId')
-        .then(user => {
-            const ingredients = user.ingredientCart.items.map(i => {
-                return { weight: i.weight, ingredient: { ...i.ingredientTemplateId._doc } };
-            });
-            const dish = new Dish({
-                name: name,
-                price: price,
-                image: req.file.path,
-                user: {
-                    name: req.user.name,
-                    userId: req.user
-                },
-                ingredientTemplates: ingredients
-            });
-            return dish.save();
-        })
-        .then(result => {
-            return req.user.clearIngredientCart();
-        })
-        .then(() => {
-            res.status(200).json({message: "git"})
-        })
-        .catch(err => console.log(err));
+  const name = req.body.name;
+  const price = req.body.price;
+  req.user
+    .populate("ingredientCart.items.ingredientTemplateId")
+    .then((user) => {
+      const ingredients = user.ingredientCart.items.map((i) => {
+        return {
+          weight: i.weight,
+          ingredient: { ...i.ingredientTemplateId._doc },
+        };
+      });
+      const dish = new Dish({
+        name: name,
+        price: price,
+        image: req.file.path,
+        user: {
+          name: req.user.name,
+          userId: req.user,
+        },
+        ingredientTemplates: ingredients,
+      });
+      return dish.save();
+    })
+    .then((result) => {
+      return req.user.clearIngredientCart();
+    })
+    .then(() => {
+      res.status(200).json({ message: "git" });
+    })
+    .catch((err) => console.log(err));
 };

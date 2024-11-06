@@ -107,6 +107,7 @@ exports.createIngredientTemplate = async (req, res, next) => {
   
   exports.createIngredient = async (req, res, next) => {
     const { name, category, expirationDate, weight, price } = req.body;
+    console.log(req.body)
 
     if (!name || !category || !expirationDate || !weight || !price) {
         return res.status(400).json({ message: 'Wszystkie pola są wymagane.' });
@@ -125,6 +126,7 @@ exports.createIngredientTemplate = async (req, res, next) => {
         await newIngredient.save();
         res.status(201).json({ message: 'Ingredient template added successfully!' });
     } catch (err) {
+        console.log('cos nie poszlo')
         console.log(err);
         const error = new HttpError('Adding ingredient template failed.', 500);
         return next(error);
