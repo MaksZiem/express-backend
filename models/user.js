@@ -45,7 +45,8 @@ const userSchema = new Schema({
       }
     ]
   }
-});
+},
+{ collection: "Users" });
 
 // userSchema.plugin(uniqieValidator)
 

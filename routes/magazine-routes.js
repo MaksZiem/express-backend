@@ -5,10 +5,14 @@ const fileUpload = require('../middleware/file-upload')
 
 router.get('/', magazineController.getAllIngredientTemplates)
 
-router.get('/:name', magazineController.getIngredientsByName);
+router.get('/:name', magazineController.getIngredientsByName)
 
 router.post('/create-ingredient-template', fileUpload.single('image'), magazineController.createIngredientTemplate)
 
 router.post('/add-ingredient', magazineController.createIngredient)
+
+router.post('/delete-ingredient', magazineController.moveIngredientToWaste)
+
+router.get('/used-ingredients', magazineController.getZeroWeightIngredients)
 
 module.exports = router;

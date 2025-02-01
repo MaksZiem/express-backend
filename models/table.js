@@ -26,10 +26,29 @@ const tableSchema = new Schema({
               ref: 'Dish',
               required: false
             },
-            quantity: { type: Number, required: false }
+            quantity: { type: Number, required: false },
+            status: {
+              type: String,
+              enum: ['taken', 'notTaken'],
+              default: 'notTaken'
+            }
           }
         ]
-      }
-});
+      },
+      usedIngredients: [
+        {
+          ingredientId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Ingredient',
+            required: true
+          },
+          amount: {
+            type: Number,
+            required: true
+          }
+        }
+      ]
+},
+{ collection: "Tables" });
 
 module.exports = mongoose.model('Table', tableSchema);

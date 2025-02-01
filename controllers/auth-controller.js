@@ -4,21 +4,35 @@ const HttpError = require('../models/http-error');
 const User = require('../models/user');
 const jwt = require('jsonwebtoken')
 
-// const getUsers = async (req, res, next) => {
-//   let users;
-//   try {
-//     users = await User.find({}, '-password');
-//   } catch (err) {
-//     const error = new HttpError(
-//       'Fetching users failed, please try again later.',
-//       500
-//     );
-//     return next(error);
-//   }
-//   res.json({ users: users.map(user => user.toObject({ getters: true })) });
-// };
+exports.getUsers = async (req, res, next) => {
+  const page = parseInt(req.query.page) || 1; 
+  const limit = parseInt(req.query.limit) || 10; 
 
-const signup = async (req, res, next) => {
+  let users;
+  let totalUsers;
+
+  try {
+    totalUsers = await User.countDocuments(); 
+    users = await User.find({}, '-password')
+      .skip((page - 1) * limit)
+      .limit(limit);
+  } catch (err) {
+    const error = new HttpError(
+      'Fetching users failed, please try again later.',
+      500
+    );
+    return next(error);
+  }
+
+  res.json({
+    users: users.map(user => user.toObject({ getters: true })),
+    total: totalUsers,
+    page: page,
+    pages: Math.ceil(totalUsers / limit) 
+  });
+};
+
+exports.signup = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return next(
@@ -93,7 +107,7 @@ const signup = async (req, res, next) => {
   res.status(201).json({ user: createdUser.id, email: createdUser.email, token: token, userRole: createdUser.role});
 };
 
-const login = async (req, res, next) => {
+exports.login = async (req, res, next) => {
   const { email, password } = req.body;
 
   let existingUser;
@@ -158,7 +172,7 @@ const login = async (req, res, next) => {
   });
 };
 
-const updateUser = async (req, res, next) => {
+exports.updateUser = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return next(
@@ -166,8 +180,8 @@ const updateUser = async (req, res, next) => {
     );
   }
 
-  const userId = req.params.userId; // Pobranie ID użytkownika z parametru URL
-  const { name, surname, email, pesel } = req.body; // Pobranie zaktualizowanych danych użytkownika z ciała zapytania
+  const userId = req.params.userId; 
+  const { name, surname, email, pesel } = req.body; 
 
   let user;
   try {
@@ -193,6 +207,10 @@ const updateUser = async (req, res, next) => {
   user.email = email;
   user.pesel = pesel;
 
+  if (req.file && req.file.path) {
+    user.image = req.file.path;
+  }
+
   try {
     await user.save();
   } catch (err) {
@@ -206,12 +224,12 @@ const updateUser = async (req, res, next) => {
   res.status(200).json({ user: user.toObject({ getters: true }) });
 };
 
-const getUserById = async (req, res, next) => {
-  const userId = req.params.userId; // Pobranie ID użytkownika z parametru URL
+exports.getUserById = async (req, res, next) => {
+  const userId = req.params.userId; 
 
   let user;
   try {
-    user = await User.findById(userId, '-password'); // Znalezienie użytkownika bez pola `password`
+    user = await User.findById(userId, '-password'); 
   } catch (err) {
     const error = new HttpError(
       'Fetching user data failed, please try again later.',
@@ -228,11 +246,6 @@ const getUserById = async (req, res, next) => {
     return next(error);
   }
 
-  res.json({ user: user.toObject({ getters: true }) }); // Zwrócenie użytkownika jako obiekt z getterami
+  res.json({ user: user.toObject({ getters: true }) }); 
 };
 
-exports.getUserById = getUserById
-// exports.getUsers = getUsers;
-exports.signup = signup;
-exports.login = login;
-exports.updateUser = updateUser;

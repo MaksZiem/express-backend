@@ -1,40 +1,84 @@
 const express = require('express');
-
 const router = express.Router();
-
 const dishesController = require('../controllers/dishes-controller')
 
+/**
+ * @swagger
+ * tags:
+ *   - name: Dishes
+ *     description: Get dishes
+ */
 
-// router.get('/:pid', dishesController.getDishById)
+/**
+ * @swagger
+ * securityDefinitions:
+ *   bearerAuth:
+ *     type: apiKey
+ *     name: Authorization
+ *     in: header
+ *     description: Provide the JWT token as "Bearer <your-token>"
+ */
 
-// router.post('/', dishesController.createDish)
+/**
+ * @swagger
+ * security:
+ *   - bearerAuth: []
+ */
+
+/**
+ * @swagger
+ * /api/dishes:
+ *   get:
+ *     tags:
+ *      - Dishes
+ *     summary: Pobierz listę dań
+ *     description: Pobiera listę dań z możliwością sortowania. Domyślne sortowanie po nazwie.
+ *     parameters:
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Pole do sortowania (np. `name` lub `-price`, gdzie `-` oznacza sortowanie malejące)
+ *     responses:
+ *       200:
+ *         description: Lista dań
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 dishes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         description: ID dania
+ *                       name:
+ *                         type: string
+ *                         description: Nazwa dania
+ *                       price:
+ *                         type: number
+ *                         description: Cena dania
+ *                       description:
+ *                         type: string
+ *                         description: Opis dania
+ *       500:
+ *         description: Błąd serwera podczas pobierania danych
+ *     security:
+ *       - bearerAuth: [] 
+ */
+router.get('/', dishesController.getDishes)
 
 router.get('/dish/:dishId', dishesController.getOrdersByDishId)
 
 router.post('/add-to-cart', dishesController.addDishToCart)
 
-// router.delete('/delete-from-cart', dishesController.postDeleteDishFromCart)
-
-// router.post('/add-order', dishesController.postCreateOrder)
-
-router.get('/', dishesController.getDishes)
-
 router.patch('/:pid', dishesController.updateDish)
 
 router.delete('/:pid', dishesController.deleteDish)
 
-// router.get('/table-cart/:tableNumber', dishesController.getDishesDashboard)
 
-// router.get('/tables', dishesController.getAllTables)
-
-// router.get('/waiting-orders', dishesController.getWaitingOrders)
-
-// router.patch('/:orderId/delivered', dishesController.markOrderAsDelivered)
-
-// router.post('/add-tip', dishesController.addTip)
-
-// router.post('/add-dish-to-table', dishesController.addDishToTableCart)
-
-// router.get('/table-cart/:tableId', dishesController.getTableCart)
 
 module.exports = router;

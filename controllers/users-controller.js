@@ -1,6 +1,7 @@
 const HttpError = require('../models/http-error');
 const User = require('../models/user')
 const { validationResult } = require('express-validator')
+const mongoose = require('mongoose');
 
 exports.getUsers = async (req, res, next) => {
     let users;
@@ -84,4 +85,31 @@ exports.login = async (req, res, next) => {
   res.json({ message: 'Logged in!' });
 };
 
+
+exports.getCurrentUser = async (req, res, next) => {
+  try {
+    const userId = req.params.userId;
+
+    // Sprawdzanie poprawności userId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ message: "Invalid user ID." });
+    }
+
+    // Pobieranie danych użytkownika
+    const user = await User.findById(userId);
+
+    // Sprawdzenie, czy użytkownik istnieje
+    if (!user) {
+        return res.status(404).json({ message: "User not found." });
+    }
+
+    // Zwracanie danych użytkownika
+    res.status(200).json({
+        user
+    });
+} catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal server error.", error: err.message });
+}
+};
 
