@@ -25,4 +25,6 @@ router.post('/add-tip', waiterController.addTip)
 
 router.post('/:waiterId/waiter-tip-stats', waiterController.getWaiterTipsStats)
 
+
+
 module.exports = router;

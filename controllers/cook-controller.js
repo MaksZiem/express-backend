@@ -447,7 +447,6 @@ exports.getCookPreparationTime = async (req, res, next) => {
       );
     }
 
-    // Zliczanie czasu przygotowania dla każdej potrawy
     orders.forEach((order) => {
       order.dishes.forEach((dish) => {
         if (dish.preparedBy && dish.preparedBy.toString() === cookId) {
@@ -481,7 +480,6 @@ exports.getCookPreparationTime = async (req, res, next) => {
       });
     });
 
-    // Obliczanie średniego czasu przygotowania na dzień
     const preparationTimeInMinutes = preparationTime.map((time) => {
       const dishesPrepared = orders.filter((order) =>
         order.dishes.some((dish) => {
