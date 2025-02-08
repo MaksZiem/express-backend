@@ -8,18 +8,18 @@ const checkAuth = require('../middleware/check-auth')
 
 router.use(checkAuth)
 
-router.post('/test4/:ingredientName', ingredientStaticsController.getIngredientUsageByPeriod)
+router.post('/usage/:ingredientName', ingredientStaticsController.getIngredientUsageByPeriod)
 
-router.post('/test5/:ingredientName', ingredientStaticsController.getIngredientWasteByPeriod)
+router.post('/waste/:ingredientName', ingredientStaticsController.getIngredientWasteByPeriod)
 
-router.get('/ingredient-waste/:ingredientName', ingredientStaticsController.calculateIngredientWasteProbability)
+router.get('/waste-propability/:ingredientName', ingredientStaticsController.calculateIngredientWasteProbability)
 
-router.get('/ingredient-niedobor', ingredientStaticsController.niedobor)
+router.get('/ingredient-deficiency', ingredientStaticsController.getDeficiency)
 
 router.get('/ingredient-in-dishes/:ingredientName', ingredientStaticsController.getIngredientUsageInDishes)
 
-router.get('/aaa', ingredientStaticsController.getExpiredIngredients)
+router.get('/expired', ingredientStaticsController.getExpiredIngredients)
 
-router.get('/bbb', ingredientStaticsController.getZeroWeightIngredients)
+router.get('/zero-weight', ingredientStaticsController.getZeroWeightIngredients)
 
 module.exports = router;

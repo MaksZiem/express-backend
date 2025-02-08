@@ -1,10 +1,7 @@
 const HttpError = require("../models/http-error");
-const { validationResult } = require("express-validator");
 const Ingredient = require("../models/ingredient");
 const IngredientTemplate = require("../models/ingredientTemplate");
 const Dish = require("../models/dish");
-const jwt = require("jsonwebtoken");
-const User = require("../models/user");
 
 exports.getIngredientDashboard = (req, res, next) => {
   const { category, name } = req.query;
@@ -57,50 +54,6 @@ exports.getIngredientDashboard = (req, res, next) => {
       res.status(500).json({ message: "Błąd serwera." });
     });
 };
-
-
-// exports.getIngredientDashboard = (req, res, next) => {
-//   const { category, name } = req.query;
-
-//   req.user
-//     .populate("ingredientCart.items.ingredientTemplateId")
-//     .then(async (user) => {
-//       const cartIngredients = user.ingredientCart.items;
-//       let filterCriteria = {};
-
-//       if (name) {
-//         filterCriteria.name = new RegExp(name, "i");
-//       }
-
-//       if (category && category !== "wszystkie") {
-//         filterCriteria.category = category;
-//       }
-
-//       const ingredients = await IngredientTemplate.find(filterCriteria);
-
-//       const ingredientsByCategory = {};
-//       ingredients.forEach((ingredient) => {
-//         const category = ingredient.category || "inne";
-//         if (!ingredientsByCategory[category]) {
-//           ingredientsByCategory[category] = [];
-//         }
-//         ingredientsByCategory[category].push(
-//           ingredient.toObject({ getters: true })
-//         );
-//       });
-
-//       res.status(200).json({
-//         ingredientsByCategory,
-//         cartIngredients: cartIngredients.map((cartItem) =>
-//           cartItem.toObject({ getters: true })
-//         ),
-//       });
-//     })
-//     .catch((err) => {
-//       console.log(err);
-//       res.status(500).json({ message: "Błąd serwera." });
-//     });
-// };
 
 exports.getIngredientDashboardMagazine = (req, res, next) => {
   const { category, name } = req.query;
@@ -167,7 +120,6 @@ exports.getIngredientWeightCheckout = (req, res, next) => {
 };
 
 exports.postIngredientCart = (req, res, next) => {
-  console.log("Received data:", req.body);
   const ingredientTemplateId = req.body.ingredientTemplateId;
   const weight = req.body.weight;
 

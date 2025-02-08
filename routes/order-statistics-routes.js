@@ -1,9 +1,6 @@
 const express = require('express');
-
 const router = express.Router();
-
 const orderStaticsController = require('../controllers/order-statistics-controller')
-
 const checkAuth = require('../middleware/check-auth')
 
 router.use(checkAuth)

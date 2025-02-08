@@ -3,7 +3,8 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 async function importData() {
-  const uri = "enter uri"
+  const uri =
+    "mongodb+srv://maximilian:Johen2001@cluster0.pyphlw1.mongodb.net/restaurant?retryWrites=true&w=majority";
   const client = new MongoClient(uri);
 
   try {

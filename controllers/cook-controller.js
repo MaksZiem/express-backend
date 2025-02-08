@@ -1,10 +1,6 @@
-const HttpError = require("../models/http-error");
-const { validationResult } = require("express-validator");
 const Dish = require("../models/dish");
 const Order = require("../models/order");
-const Ingredient = require("../models/ingredient");
 const Table = require("../models/table");
-const Tip = require("../models/tip");
 const mongoose = require("mongoose");
 
 exports.getWaitingOrders = async (req, res, next) => {
@@ -271,119 +267,6 @@ exports.getDishesCountByCook = async (req, res, next) => {
   }
 };
 
-exports.getCookPreparationTime2901 = async (req, res, next) => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const endOfToday = new Date(today);
-    endOfToday.setHours(23, 59, 59, 999);
-
-    let startDate;
-    const period = req.body.period || "tydzien";
-    const cookId = req.params.cookId;
-
-    if (!mongoose.Types.ObjectId.isValid(cookId)) {
-      return res.status(400).json({ message: "Invalid cook ID." });
-    }
-
-    if (period === "tydzien") {
-      startDate = new Date(today);
-      startDate.setDate(today.getDate() - 6);
-    } else if (period === "miesiac") {
-      startDate = new Date(today);
-      startDate.setDate(1);
-    } else if (period === "rok") {
-      startDate = new Date(today.getFullYear(), 0, 1);
-    } else {
-      return res.status(400).json({
-        message: "Invalid period. Choose 'tydzien', 'miesiac', or 'rok'.",
-      });
-    }
-
-    const orders = await Order.find({
-      "dishes.preparedBy": cookId,
-      "dishes.doneByCookDate": { $gte: startDate, $lt: endOfToday },
-    });
-
-    let preparationTime, labels;
-
-    if (period === "tydzien") {
-      preparationTime = Array(7).fill(0);
-      labels = Array(7);
-
-      for (let i = 0; i < 7; i++) {
-        const day = new Date(startDate);
-        day.setDate(startDate.getDate() + i);
-        labels[i] = day.toLocaleDateString("pl-PL", { weekday: "short" });
-      }
-    } else if (period === "miesiac") {
-      const daysInMonth = new Date(
-        today.getFullYear(),
-        today.getMonth() + 1,
-        0
-      ).getDate();
-      preparationTime = Array(daysInMonth).fill(0);
-      labels = Array.from({ length: daysInMonth }, (_, i) =>
-        (i + 1).toString()
-      );
-    } else if (period === "rok") {
-      const currentMonth = today.getMonth();
-      preparationTime = Array(currentMonth + 1).fill(0);
-      labels = Array.from({ length: currentMonth + 1 }, (_, i) =>
-        (i + 1).toString()
-      );
-    }
-
-    orders.forEach((order) => {
-      order.dishes.forEach((dish) => {
-        if (dish.preparedBy && dish.preparedBy.toString() === cookId) {
-          const dateToCheck = new Date(dish.doneByCookDate);
-          let timeToPrepare = 0;
-          if (dish.doneByCookDate) {
-            timeToPrepare =
-              new Date(dish.doneByCookDate) - new Date(order.orderDate);
-          }
-
-          if (period === "tydzien") {
-            const daysAgo = Math.floor(
-              (dateToCheck - startDate) / (1000 * 60 * 60 * 24)
-            );
-            const dayIndex = daysAgo;
-            if (dayIndex >= 0 && dayIndex < 7) {
-              preparationTime[dayIndex] += timeToPrepare;
-            }
-          } else if (period === "miesiac") {
-            const dayIndex = dateToCheck.getDate() - 1;
-            if (dayIndex >= 0 && dayIndex < preparationTime.length) {
-              preparationTime[dayIndex] += timeToPrepare;
-            }
-          } else if (period === "rok") {
-            const monthIndex = dateToCheck.getMonth();
-            if (monthIndex >= 0 && monthIndex < preparationTime.length) {
-              preparationTime[monthIndex] += timeToPrepare;
-            }
-          }
-        }
-      });
-    });
-
-    const preparationTimeInMinutes = preparationTime.map((time) =>
-      Math.round(time / (1000 * 60))
-    );
-
-    res.status(200).json({
-      labels,
-      preparationTime: preparationTimeInMinutes,
-    });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ message: "Internal server error.", error: err.message });
-  }
-};
-
 exports.getCookDishesCount = async (req, res, next) => {
   try {
     const today = new Date();
@@ -496,8 +379,6 @@ exports.getCookDishesCount = async (req, res, next) => {
   }
 };
 
-
-
 exports.getCookPreparationTime = async (req, res, next) => {
   try {
     const today = new Date();
@@ -521,10 +402,10 @@ exports.getCookPreparationTime = async (req, res, next) => {
       startDate = new Date(today);
       startDate.setDate(1);
     } else if (period === "rok") {
-        startDate = new Date(today);
-        startDate.setFullYear(today.getFullYear() - 1);
-        startDate.setMonth(today.getMonth()); // Ustawienie na początek tego samego miesiąca
-        startDate.setDate(1);
+      startDate = new Date(today);
+      startDate.setFullYear(today.getFullYear() - 1);
+      startDate.setMonth(today.getMonth()); // Ustawienie na początek tego samego miesiąca
+      startDate.setDate(1);
     } else {
       return res.status(400).json({
         message: "Invalid period. Choose 'tydzien', 'miesiac', or 'rok'.",
@@ -573,13 +454,11 @@ exports.getCookPreparationTime = async (req, res, next) => {
           const dateToCheck = new Date(dish.doneByCookDate);
           let timeToPrepare = 0;
 
-          // Upewnienie się, że daty są poprawne
           if (dish.doneByCookDate && order.orderDate) {
             timeToPrepare =
               new Date(dish.doneByCookDate) - new Date(order.orderDate);
           }
 
-          // Przypisanie czasów do odpowiednich dni
           if (period === "tydzien") {
             const daysAgo = Math.floor(
               (dateToCheck - startDate) / (1000 * 60 * 60 * 24)
@@ -588,12 +467,12 @@ exports.getCookPreparationTime = async (req, res, next) => {
               preparationTime[daysAgo] += timeToPrepare;
             }
           } else if (period === "miesiac") {
-            const dayIndex = dateToCheck.getDate() - 1; // Dopasowanie do dnia w miesiącu
+            const dayIndex = dateToCheck.getDate() - 1;
             if (dayIndex >= 0 && dayIndex < preparationTime.length) {
               preparationTime[dayIndex] += timeToPrepare;
             }
           } else if (period === "rok") {
-            const monthIndex = dateToCheck.getMonth(); // Dopasowanie do miesiąca
+            const monthIndex = dateToCheck.getMonth();
             if (monthIndex >= 0 && monthIndex < preparationTime.length) {
               preparationTime[monthIndex] += timeToPrepare;
             }
@@ -648,307 +527,6 @@ exports.getCookPreparationTime = async (req, res, next) => {
       );
       labels.push(...labels.splice(0, currentMonth + 1));
     }
-
-    res.status(200).json({
-      labels,
-      preparationTime: preparationTimeInMinutes,
-    });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ message: "Internal server error.", error: err.message });
-  }
-};
-
-exports.getCookPreparationTimeclose = async (req, res, next) => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(today);
-    endOfToday.setHours(23, 59, 59, 999);
-
-    let startDate;
-    const period = req.body.period || "tydzien";
-    const cookId = req.params.cookId;
-
-    if (!mongoose.Types.ObjectId.isValid(cookId)) {
-      return res.status(400).json({ message: "Invalid cook ID." });
-    }
-
-    // Ustawienie startowej daty w zależności od okresu
-    if (period === "tydzien") {
-      startDate = new Date(today);
-      startDate.setDate(today.getDate() - 6);
-    } else if (period === "miesiac") {
-      startDate = new Date(today);
-      startDate.setDate(1);
-    } else if (period === "rok") {
-      startDate = new Date(today);
-      startDate.setFullYear(today.getFullYear() - 1);
-    } else {
-      return res.status(400).json({
-        message: "Invalid period. Choose 'tydzien', 'miesiac', or 'rok'.",
-      });
-    }
-
-    const orders = await Order.find({
-      "dishes.preparedBy": cookId,
-      "dishes.doneByCookDate": { $gte: startDate, $lt: endOfToday },
-    });
-
-    let preparationTime, labels;
-
-    // Przygotowanie odpowiednich tablic w zależności od okresu
-    if (period === "tydzien") {
-      preparationTime = Array(7).fill(0);
-      labels = Array(7);
-      for (let i = 0; i < 7; i++) {
-        const day = new Date(startDate);
-        day.setDate(startDate.getDate() + i);
-        labels[i] = day.toLocaleDateString("pl-PL", { weekday: "short" });
-      }
-    } else if (period === "miesiac") {
-      const daysInMonth = new Date(
-        today.getFullYear(),
-        today.getMonth() + 1,
-        0
-      ).getDate();
-      preparationTime = Array(daysInMonth).fill(0);
-      labels = Array.from({ length: daysInMonth }, (_, i) =>
-        (i + 1).toString()
-      );
-    } else if (period === "rok") {
-      preparationTime = Array(12).fill(0);
-      labels = Array.from({ length: 12 }, (_, i) =>
-        new Date(today.getFullYear(), i, 1).toLocaleDateString("pl-PL", {
-          month: "short",
-        })
-      );
-    }
-
-    // Zliczanie czasu przygotowania dla każdej potrawy
-    orders.forEach((order) => {
-      order.dishes.forEach((dish) => {
-        if (dish.preparedBy && dish.preparedBy.toString() === cookId) {
-          const dateToCheck = new Date(dish.doneByCookDate);
-          let timeToPrepare = 0;
-
-          // Upewnienie się, że daty są poprawne
-          if (dish.doneByCookDate && order.orderDate) {
-            timeToPrepare =
-              new Date(dish.doneByCookDate) - new Date(order.orderDate);
-          }
-
-          // Przypisanie czasów do odpowiednich dni
-          if (period === "tydzien") {
-            const daysAgo = Math.floor(
-              (dateToCheck - startDate) / (1000 * 60 * 60 * 24)
-            );
-            if (daysAgo >= 0 && daysAgo < 7) {
-              preparationTime[daysAgo] += timeToPrepare;
-            }
-          } else if (period === "miesiac") {
-            const dayIndex = dateToCheck.getDate() - 1; // Dopasowanie do dnia w miesiącu
-            if (dayIndex >= 0 && dayIndex < preparationTime.length) {
-              preparationTime[dayIndex] += timeToPrepare;
-            }
-          } else if (period === "rok") {
-            const monthIndex = dateToCheck.getMonth(); // Dopasowanie do miesiąca
-            if (monthIndex >= 0 && monthIndex < preparationTime.length) {
-              preparationTime[monthIndex] += timeToPrepare;
-            }
-          }
-        }
-      });
-    });
-
-    // Obliczanie średniego czasu przygotowania na dzień
-    const preparationTimeInMinutes = preparationTime.map((time) => {
-      const dishesPrepared = orders.filter((order) =>
-        order.dishes.some((dish) => {
-          const dateToCheck = new Date(dish.doneByCookDate);
-          if (period === "tydzien") {
-            const daysAgo = Math.floor(
-              (dateToCheck - startDate) / (1000 * 60 * 60 * 24)
-            );
-            return (
-              dish.preparedBy.toString() === cookId &&
-              daysAgo >= 0 &&
-              daysAgo < 7
-            );
-          } else if (period === "miesiac") {
-            const dayIndex = dateToCheck.getDate() - 1;
-            return (
-              dish.preparedBy.toString() === cookId &&
-              dayIndex >= 0 &&
-              dayIndex < preparationTime.length
-            );
-          } else if (period === "rok") {
-            const monthIndex = dateToCheck.getMonth();
-            return (
-              dish.preparedBy.toString() === cookId &&
-              monthIndex >= 0 &&
-              monthIndex < preparationTime.length
-            );
-          }
-          return false;
-        })
-      ).length;
-
-      return dishesPrepared > 0
-        ? Math.round(time / (1000 * 60 * dishesPrepared))
-        : 0;
-    });
-
-    // Dostosowanie dla okresu "rok": obrót tablic preparationTimeInMinutes i labels
-    if (period === "rok") {
-      const currentMonth = today.getMonth();
-      preparationTimeInMinutes.unshift(
-        ...preparationTimeInMinutes.splice(12 - currentMonth - 1)
-      );
-      labels.unshift(...labels.splice(12 - currentMonth - 1));
-    }
-
-    console.log(labels);
-    console.log(preparationTimeInMinutes);
-
-    res.status(200).json({
-      labels,
-      preparationTime: preparationTimeInMinutes,
-    });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ message: "Internal server error.", error: err.message });
-  }
-};
-
-exports.getCookPreparationTimeCLOSE = async (req, res, next) => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(today);
-    endOfToday.setHours(23, 59, 59, 999);
-
-    let startDate;
-    const period = req.body.period || "tydzien";
-    const cookId = req.params.cookId;
-
-    if (!mongoose.Types.ObjectId.isValid(cookId)) {
-      return res.status(400).json({ message: "Invalid cook ID." });
-    }
-
-    // Ustawienie startowej daty w zależności od okresu
-    if (period === "tydzien") {
-      startDate = new Date(today);
-      startDate.setDate(today.getDate() - 6);
-    } else if (period === "miesiac") {
-      startDate = new Date(today);
-      startDate.setDate(1);
-    } else if (period === "rok") {
-      startDate = new Date(today);
-      startDate.setFullYear(today.getFullYear() - 1);
-    } else {
-      return res.status(400).json({
-        message: "Invalid period. Choose 'tydzien', 'miesiac', or 'rok'.",
-      });
-    }
-
-    const orders = await Order.find({
-      "dishes.preparedBy": cookId,
-      "dishes.doneByCookDate": { $gte: startDate, $lt: endOfToday },
-    });
-
-    let preparationTime, labels;
-
-    // Przygotowanie odpowiednich tablic w zależności od okresu
-    if (period === "tydzien") {
-      preparationTime = Array(7).fill(0);
-      labels = Array(7);
-      for (let i = 0; i < 7; i++) {
-        const day = new Date(startDate);
-        day.setDate(startDate.getDate() + i);
-        labels[i] = day.toLocaleDateString("pl-PL", { weekday: "short" });
-      }
-    } else if (period === "miesiac") {
-      const daysInMonth = new Date(
-        today.getFullYear(),
-        today.getMonth() + 1,
-        0
-      ).getDate();
-      preparationTime = Array(daysInMonth).fill(0);
-      labels = Array.from({ length: daysInMonth }, (_, i) =>
-        (i + 1).toString()
-      );
-    } else if (period === "rok") {
-      preparationTime = Array(12).fill(0);
-      labels = Array.from({ length: 12 }, (_, i) =>
-        new Date(
-          today.getFullYear(),
-          today.getMonth() - i,
-          1
-        ).toLocaleDateString("pl-PL", { month: "short" })
-      ).reverse();
-    }
-
-    // Zliczanie czasu przygotowania dla każdej potrawy
-    orders.forEach((order) => {
-      order.dishes.forEach((dish) => {
-        if (dish.preparedBy && dish.preparedBy.toString() === cookId) {
-          const dateToCheck = new Date(dish.doneByCookDate);
-          let timeToPrepare = 0;
-
-          // Upewnienie się, że daty są poprawne
-          if (dish.doneByCookDate && order.orderDate) {
-            timeToPrepare =
-              new Date(dish.doneByCookDate) - new Date(order.orderDate);
-          }
-
-          // Przypisanie czasów do odpowiednich dni
-          if (period === "tydzien") {
-            const daysAgo = Math.floor(
-              (dateToCheck - startDate) / (1000 * 60 * 60 * 24)
-            );
-            if (daysAgo >= 0 && daysAgo < 7) {
-              preparationTime[daysAgo] += timeToPrepare;
-            }
-          } else if (period === "miesiac") {
-            const dayIndex = dateToCheck.getDate() - 1; // Dopasowanie do dnia w miesiącu
-            if (dayIndex >= 0 && dayIndex < preparationTime.length) {
-              preparationTime[dayIndex] += timeToPrepare;
-            }
-          } else if (period === "rok") {
-            const monthIndex = dateToCheck.getMonth(); // Dopasowanie do miesiąca
-            if (monthIndex >= 0 && monthIndex < preparationTime.length) {
-              preparationTime[monthIndex] += timeToPrepare;
-            }
-          }
-        }
-      });
-    });
-
-    // Obliczanie średniego czasu przygotowania na dzień
-    const preparationTimeInMinutes = preparationTime.map((time) => {
-      // Podziel sumę czasu przez liczbę potraw, które zostały przygotowane w danym dniu
-      const dishesPrepared = orders.filter((order) =>
-        order.dishes.some(
-          (dish) =>
-            dish.preparedBy.toString() === cookId &&
-            new Date(dish.doneByCookDate).toLocaleDateString() ===
-              new Date(order.orderDate).toLocaleDateString()
-        )
-      ).length;
-
-      return dishesPrepared > 0
-        ? Math.round(time / (1000 * 60 * dishesPrepared))
-        : 0;
-    });
-
-    console.log(orders);
-    console.log(preparationTimeInMinutes);
-    console.log(labels);
 
     res.status(200).json({
       labels,

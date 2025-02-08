@@ -25,7 +25,8 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
 
-const MONGODB_URI = "enter uri"
+const MONGODB_URI =
+'mongodb+srv://maximilian:Johen2001@cluster0.pyphlw1.mongodb.net/restaurant?retryWrites=true&w=majority'
 
 const app = express();
 const store = new MongoDBStore({

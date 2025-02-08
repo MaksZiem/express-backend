@@ -14,7 +14,9 @@ router.post('/dish-week-days-stats/:dishId', dishStaticsController.getDishPopula
 
 router.post('/dish-total/:dishId', dishStaticsController.getDishOrdersStatsByPeriod)
 
-router.post('/test', dishStaticsController.getDishRevenuePrediction)
+router.post('/dish-revenue-prediction', dishStaticsController.getDishRevenuePrediction)
+
+router.post('/dishes-count', dishStaticsController.dishesCount)
 
 router.put('/update/:dishId', fileUpload.single('image'), dishStaticsController.updateDish)
 
@@ -25,5 +27,7 @@ router.post('/add-ingredient/:dishId' , dishStaticsController.addIngredientToDis
 router.delete('/delete-dish/:dishId', dishStaticsController.deleteDish)
 
 router.delete('/delete-ingredient/:dishId/:ingredientId', dishStaticsController.deleteIngredient)
+
+
 
 module.exports = router;

@@ -15,4 +15,6 @@ router.post('/delete-ingredient', magazineController.moveIngredientToWaste)
 
 router.get('/used-ingredients', magazineController.getZeroWeightIngredients)
 
+router.get('/test-30', magazineController.getDishOrdersLast30Days)
+
 module.exports = router;

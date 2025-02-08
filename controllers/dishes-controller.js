@@ -4,62 +4,6 @@ const Dish = require("../models/dish");
 const Order = require("../models/order");
 const mongoose = require("mongoose");
 
-// exports.getDishes = async (req, res, next) => {
-//   try {
-//     const dishes = await Dish.find();
-
-//     res.status(200).json({
-//       dishes: dishes.map((dish) => dish.toObject({ getters: true })),
-//     });
-//   } catch (err) {
-//     console.log(err);
-//     return res
-//       .status(500)
-//       .json({ message: "Błąd podczas pobierania danych z koszyka stolika." });
-//   }
-// };
-
-// exports.getDishes = async (req, res, next) => {
-//   const { sort } = req.query;
-
-//   try {
-//     let sortCriteria = {};
-//     if (sort) {
-//       switch (sort) {
-//         case "name":
-//           sortCriteria.name = 1; // Rosnąco
-//           break;
-//         case "-name":
-//           sortCriteria.name = -1; // Malejąco
-//           break;
-//         case "price":
-//           sortCriteria.price = 1;
-//           break;
-//         case "-price":
-//           sortCriteria.price = -1;
-//           break;
-//         case "availability":
-//           sortCriteria.isAvailable = -1; // Dostępne na początku
-//           break;
-//         case "-availability":
-//           sortCriteria.isAvailable = 1; // Niedostępne na początku
-//           break;
-//       }
-//     }
-
-//     const dishes = await Dish.find().sort(sortCriteria);
-
-//     res.status(200).json({
-//       dishes: dishes.map((dish) => dish.toObject({ getters: true })),
-//     });
-//   } catch (err) {
-//     console.log(err);
-//     return res 
-//       .status(500)
-//       .json({ message: "Błąd podczas pobierania danych z koszyka stolika." });
-//   }
-// };
-
 exports.getDishes = async (req, res, next) => {
   try {
     const sortParam = req.query.sort || "name"; 
@@ -81,8 +25,6 @@ exports.getDishes = async (req, res, next) => {
       .json({ message: "Błąd podczas pobierania danych z koszyka stolika." });
   }
 };
-
-
 
 exports.getOrdersByDishId = (req, res, next) => {
   const dishId = req.params.dishId;
@@ -170,11 +112,6 @@ exports.updateDish = async (req, res, next) => {
 
   res.status(200).json({ dish: dish.toObject({ getters: true }) });
 };
-
-
-  
-  
-
 
 exports.deleteDish = async (req, res, next) => {
   const dishId = req.params.pid;
