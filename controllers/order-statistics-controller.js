@@ -93,7 +93,7 @@ exports.getMostPopularDishes = (req, res, next) => {
 
 exports.getDishPercentage = (req, res, next) => {
   const period = req.body.periodPercentage || "tydzien";
-
+  console.log('przychod')
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -101,7 +101,7 @@ exports.getDishPercentage = (req, res, next) => {
   switch (period) {
     case "miesiac":
       startDate = new Date(today);
-      startDate.setMonth(today.getMonth());
+      startDate.setDate(1);
       break;
     case "rok":
       startDate = new Date(today);
@@ -160,6 +160,8 @@ exports.getDishPercentage = (req, res, next) => {
       res.status(500).json({ message: "Wystąpił błąd." });
     });
 };
+
+
 
 exports.getOrdersStats = (req, res, next) => {
   const today = new Date();
@@ -309,7 +311,7 @@ exports.getTotalProfit = async (req, res, next) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
+    console.log('procenty')
     let startDate;
     const period = req.body.periodPercentage || "tydzien";
 
@@ -428,6 +430,7 @@ exports.getTotalProfit = async (req, res, next) => {
       .json({ message: "Wystąpił błąd podczas obliczania zysku." });
   }
 };
+
 
 exports.getOrdersByDayOfWeek = async (req, res, next) => {
   try {

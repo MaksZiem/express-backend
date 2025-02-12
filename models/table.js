@@ -37,6 +37,11 @@ const tableSchema = new Schema({
       },
       usedIngredients: [
         {
+          dishId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Dish',
+            required: true
+          },
           ingredientId: {
             type: Schema.Types.ObjectId,
             ref: 'Ingredient',

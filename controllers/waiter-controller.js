@@ -318,7 +318,7 @@ exports.addTip = async (req, res, next) => {
   }
 };
 
-exports.addDishToTableCart = async (req, res, next) => {
+exports.addDishToTableCart2 = async (req, res, next) => {
   const { tableNumber, dishId } = req.body;
   console.log(tableNumber);
   try {
@@ -386,7 +386,7 @@ exports.addDishToTableCart = async (req, res, next) => {
   }
 };
 
-exports.removeDishFromTableCart = async (req, res, next) => {
+exports.removeDishFromTableCart2 = async (req, res, next) => {
   const { tableNumber, dishId } = req.body;
 
   try {
@@ -445,6 +445,168 @@ exports.removeDishFromTableCart = async (req, res, next) => {
       .json({ message: "Wystąpił błąd podczas aktualizacji koszyka stolika." });
   }
 };
+
+exports.removeDishFromTableCart = async (req, res, next) => {
+  const { tableNumber, dishId } = req.body;
+
+  try {
+    // Znajdź stolik po numerze
+    const table = await Table.findOne({ number: tableNumber });
+    if (!table) {
+      return res.status(404).json({ message: "Stolik o podanym numerze nie istnieje." });
+    }
+
+    // Znajdź danie i uzupełnij dane składników (przydatne, jeśli będziesz potrzebować dodatkowych walidacji)
+    const dish = await Dish.findById(dishId).populate("ingredientTemplates.ingredient");
+    if (!dish) {
+      return res.status(404).json({ message: "Danie nie zostało znalezione." });
+    }
+
+    // Sprawdź, czy danie znajduje się w koszyku stolika
+    const dishItem = table.dishCart.items.find(
+      (item) => item.dishId.toString() === dishId.toString()
+    );
+    if (!dishItem) {
+      return res.status(404).json({ message: "Danie nie znajduje się w koszyku." });
+    }
+
+    // Wyszukaj wszystkie wpisy w usedIngredients, które dotyczą usuwanego dania
+    // (zakładamy, że podczas dodawania dania do koszyka, dla każdego zużytego składnika zapisano
+    //  informację o dishId, ingredientId i amount)
+    const usedIngredientsForDish = table.usedIngredients.filter(
+      (ui) => ui.dishId.toString() === dishId.toString()
+    );
+
+    // Dla każdego wpisu przywracamy odpowiednią ilość do konkretnego dokumentu składnika
+    for (const ui of usedIngredientsForDish) {
+      const ingredientDoc = await Ingredient.findById(ui.ingredientId);
+      if (!ingredientDoc) {
+        // Można tutaj zalogować błąd, ale kontynuujemy przetwarzanie
+        console.warn(`Nie znaleziono składnika o ID: ${ui.ingredientId}`);
+        continue;
+      }
+      ingredientDoc.weight += ui.amount;
+      await ingredientDoc.save();
+    }
+
+    // Usuń wpisy dotyczące usuwanego dania z tablicy usedIngredients
+    table.usedIngredients = table.usedIngredients.filter(
+      (ui) => ui.dishId.toString() !== dishId.toString()
+    );
+
+    // Usuń danie z koszyka stolika
+    table.dishCart.items = table.dishCart.items.filter(
+      (item) => item.dishId.toString() !== dishId.toString()
+    );
+
+    await table.save();
+
+    // Opcjonalnie – ustawienie flagi isAvailable dla dania
+    dish.isAvailable = true;
+    await dish.save();
+
+    res.status(200).json({
+      message: "Danie zostało usunięte z koszyka stolika.",
+      dishCart: table.dishCart,
+    });
+  } catch (err) {
+    console.error("Błąd podczas usuwania dania z koszyka stolika:", err);
+    res.status(500).json({ message: "Wystąpił błąd podczas aktualizacji koszyka stolika." });
+  }
+};
+
+exports.addDishToTableCart = async (req, res, next) => {
+  const { tableNumber, dishId } = req.body;
+  console.log(tableNumber);
+  try {
+    // Znajdź stolik po numerze
+    const table = await Table.findOne({ number: tableNumber });
+    if (!table) {
+      return res
+        .status(404)
+        .json({ message: "Stolik o podanym numerze nie istnieje." });
+    }
+
+    // Znajdź danie i uzupełnij dane składników
+    const dish = await Dish.findById(dishId).populate("ingredientTemplates.ingredient");
+    if (!dish) {
+      return res.status(404).json({ message: "Danie nie zostało znalezione." });
+    }
+
+    // Dla każdego składnika potrzebnego do przygotowania dania
+    for (const ingredientTemplate of dish.ingredientTemplates) {
+      const ingredientName = ingredientTemplate.ingredient.name;
+      let remainingQuantity = ingredientTemplate.weight;
+
+      // Pobierz dostępne dokumenty składnika sortując po dacie ważności (FIFO)
+      const availableIngredients = await Ingredient.find({
+        name: ingredientName,
+      }).sort({ expirationDate: 1 });
+
+      // Iteruj po dostępnych dokumentach i odejmuj zużywaną ilość
+      for (const storedIngredient of availableIngredients) {
+        if (remainingQuantity <= 0) break;
+
+        let usedAmount = 0;
+        if (storedIngredient.weight >= remainingQuantity) {
+          // Jeśli z jednego dokumentu starczy, odejmij tylko wymaganą ilość
+          usedAmount = remainingQuantity;
+          storedIngredient.weight -= remainingQuantity;
+          remainingQuantity = 0;
+        } else {
+          // Jeśli z jednego dokumentu nie starczy, zużyj cały dostępny stan
+          usedAmount = storedIngredient.weight;
+          remainingQuantity -= storedIngredient.weight;
+          storedIngredient.weight = 0;
+        }
+        await storedIngredient.save();
+
+        // Zapisz informacje o użytym składniku do tablicy usedIngredients
+        table.usedIngredients.push({
+          dishId: dish._id,
+          ingredientId: storedIngredient._id,
+          amount: usedAmount,
+        });
+      }
+
+      // Jeśli po przetworzeniu wszystkich dokumentów nadal brakuje składnika,
+      // zwróć błąd
+      if (remainingQuantity > 0) {
+        return res.status(400).json({
+          message: `Brakuje składnika: ${ingredientName}`,
+        });
+      }
+    }
+
+    // Dodaj danie do koszyka stolika lub zwiększ ilość, jeśli już istnieje
+    const existingDishIndex = table.dishCart.items.findIndex(
+      (item) => item.dishId.toString() === dishId.toString()
+    );
+    if (existingDishIndex >= 0) {
+      table.dishCart.items[existingDishIndex].quantity += 1;
+    } else {
+      table.dishCart.items.push({ dishId, quantity: 1 });
+    }
+
+    await table.save();
+
+    res.status(200).json({
+      message: "Danie zostało dodane do koszyka stolika.",
+      dishCart: table.dishCart,
+    });
+  } catch (err) {
+    console.error("Błąd podczas dodawania dania do koszyka stolika:", err);
+    res.status(500).json({
+      message: "Wystąpił błąd podczas aktualizacji koszyka stolika.",
+    });
+  }
+};
+
+
+
+
+
+
 
 exports.getUserOrders = async (req, res, next) => {
   const userId = req.params.userId;
