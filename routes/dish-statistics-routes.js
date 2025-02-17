@@ -26,6 +26,8 @@ router.post('/add-ingredient/:dishId' , dishStaticsController.addIngredientToDis
 
 router.delete('/delete-dish/:dishId', dishStaticsController.deleteDish)
 
+router.post('/:dishId/history', dishStaticsController.getDishRevenueByDateRange)
+
 router.delete('/delete-ingredient/:dishId/:ingredientId', dishStaticsController.deleteIngredient)
 
 

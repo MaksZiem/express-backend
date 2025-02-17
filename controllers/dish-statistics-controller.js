@@ -633,7 +633,7 @@ exports.getDishRevenuePredictionbest = async (req, res, next) => {
   }
 };
 
-exports.getDishRevenuePredictionuzywabe = async (req, res, next) => {
+exports.getDishRevenuePredictionuzywabebezrankingu = async (req, res, next) => {
   console.log("NAJBLIZSZA - rozpoczęcie prognozowania przychodów");
   try {
     const currentDate = new Date();
@@ -919,6 +919,7 @@ exports.getDishRevenuePredictionuzywabe = async (req, res, next) => {
   }
 };
 
+// aktualna 14.02 zwraca ranking
 exports.getDishRevenuePrediction = async (req, res, next) => {
   console.log("NAJBLIZSZA - rozpoczęcie prognozowania przychodów");
   try {
@@ -1173,6 +1174,279 @@ exports.getDishRevenuePrediction = async (req, res, next) => {
     return res.status(500).json({ message: "Wystąpił błąd podczas prognozowania przychodów." });
   }
 };
+
+exports.getDishRevenuePrediction = async (req, res, next) => {
+  console.log("NAJBLIZSZA - rozpoczęcie prognozowania przychodów");
+  try {
+    const currentDate = new Date();
+    console.log("Aktualna data:", currentDate);
+
+    // Pobranie liczby lat do analizy z parametrów (domyślnie 2, jeśli nie podano)
+    const yearsCount = Number(req.query.years) || 2;
+    const currentYear = currentDate.getFullYear();
+
+    console.log(yearsCount)
+
+    const getStartDateAndEndDate = (year) => {
+      const now = new Date();
+      const startDate = new Date(year, now.getMonth() + 1, 1);
+      const endDate = new Date(year, now.getMonth() + 1 + 3, 0);
+      console.log(`Zakres dat dla roku ${year} (dynamicznie ustalany):`, {
+        startDate,
+        endDate,
+      });
+      return { startDate, endDate };
+    };
+
+    // Pobranie zamówień dla kolejnych lat wstecz (zaczynamy od roku poprzedniego)
+    const yearsData = [];
+    for (let i = 1; i <= yearsCount; i++) {
+      const year = currentYear - i;
+      const { startDate, endDate } = getStartDateAndEndDate(year);
+      const orders = await Order.find({
+        orderDate: { $gte: startDate, $lt: endDate },
+      });
+      console.log(`Zamówienia ${year}:`, orders.length, "znalezionych zamówień");
+      yearsData.push({ year, orders });
+    }
+
+    // Funkcja do ustalenia indeksu miesiąca (np. 0 - marzec, 1 - kwiecień, 2 - maj)
+    const getMonthIndex = (date) => date.getMonth() - 2;
+
+    // Funkcja zliczająca liczbę zamówień dla danego dania wg miesięcy
+    const countDishesInOrders = (orders) => {
+      return orders.reduce((result, order) => {
+        order.dishes.forEach((dish) => {
+          const dishId = dish.dish._id.toString();
+          const monthIndex = getMonthIndex(order.orderDate);
+          console.log(
+            `Przetwarzanie zamówienia (ID: ${order._id}) - dla dania (ID: ${dishId}) w indeksie miesiąca ${monthIndex} (data zamówienia: ${order.orderDate.toISOString()}). Ilość: ${dish.quantity}`
+          );
+          if (!result[dishId]) {
+            result[dishId] = { monthlyCounts: [0, 0, 0] };
+          }
+          result[dishId].monthlyCounts[monthIndex] += dish.quantity;
+        });
+        return result;
+      }, {});
+    };
+
+    // Dla każdego roku tworzymy obiekt zliczeń dań
+    const dishCountsByYear = {};
+    yearsData.forEach(({ year, orders }) => {
+      dishCountsByYear[year] = countDishesInOrders(orders);
+      console.log(`Liczba zamówień dla dań w ${year} (miesięczne):`, dishCountsByYear[year]);
+    });
+
+    console.log(
+      "Wyjaśnienie danych miesięcznych: tablica [a, b, c] oznacza kolejno liczbę zamówień w miesiącach:"
+    );
+    console.log(" - indeks 0: marzec,");
+    console.log(" - indeks 1: kwiecień,");
+    console.log(" - indeks 2: maj.");
+    console.log(
+      "Przykład: Dane miesięczne: [3,4,5] oznaczają, że w marcu było 3 zamówienia, w kwietniu 4, a w maju 5."
+    );
+
+    const dishes = await Dish.find();
+    console.log("Pobrano dania:", dishes.length);
+    if (!dishes || dishes.length === 0) {
+      return res.status(404).json({ message: "Nie znaleziono żadnych dań." });
+    }
+
+    const getInitialOrders = async () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      console.log("Data 30 dni temu:", thirtyDaysAgo);
+
+      const recentOrders = await Order.find({
+        orderDate: { $gte: thirtyDaysAgo },
+      });
+      console.log("Zamówienia z ostatnich 30 dni:", recentOrders.length);
+
+      const dishCounts = {};
+      recentOrders.forEach((order) => {
+        order.dishes.forEach((dish) => {
+          const dishId = dish.dish._id.toString();
+          if (!dishCounts[dishId]) {
+            dishCounts[dishId] = 0;
+          }
+          dishCounts[dishId] += dish.quantity;
+        });
+      });
+      console.log("Liczba zamówień dla dań z ostatnich 30 dni:", dishCounts);
+      return dishCounts;
+    };
+
+    const dishInitialOrders = await getInitialOrders();
+
+    // Funkcja obliczająca zmiany procentowe pomiędzy kolejnymi danymi
+    const calculatePercentageChangesFromData = (monthlyCounts, initial) => {
+      const combined = [initial, ...monthlyCounts];
+      const changes = [];
+      for (let i = 1; i < combined.length; i++) {
+        changes.push(
+          combined[i - 1] === 0
+            ? 0
+            : ((combined[i] - combined[i - 1]) / combined[i - 1]) * 100
+        );
+      }
+      return changes;
+    };
+
+    // Funkcja uśredniająca zmiany procentowe z danych z wielu lat
+    const calculateAveragePercentageChangesForMultipleYears = (dataSets, initial) => {
+      if (dataSets.length === 0) return [0, 0, 0];
+      let sums = [0, 0, 0];
+      dataSets.forEach((monthlyCounts) => {
+        const changes = calculatePercentageChangesFromData(monthlyCounts, initial);
+        for (let i = 0; i < changes.length; i++) {
+          sums[i] += changes[i];
+        }
+      });
+      const avgChanges = sums.map((sum) => sum / dataSets.length);
+      return avgChanges;
+    };
+
+    const results = [];
+
+    for (const dish of dishes) {
+      console.log(`\nPrzetwarzanie dania: ${dish.name} (ID: ${dish._id})`);
+      let totalIngredientCost = 0;
+      const ingredientDetails = [];
+
+      for (const ingTemplate of dish.ingredientTemplates) {
+        const ingredientName = ingTemplate.ingredient.name;
+        const ingredientWeightInDish = parseFloat(ingTemplate.weight);
+        console.log(
+          `  Składnik: ${ingredientName} - waga w daniu: ${ingredientWeightInDish}`
+        );
+        const matchingIngredients = await Ingredient.find({
+          name: ingredientName,
+        });
+        console.log(
+          `  Znaleziono ${matchingIngredients.length} rekordów dla składnika ${ingredientName}`
+        );
+
+        if (matchingIngredients.length === 0) continue;
+
+        let totalPriceRatio = 0;
+        let totalCount = 0;
+        matchingIngredients.forEach((ingredient) => {
+          const ratio = ingredient.priceRatio || ingredient.price / ingredient.weight;
+          totalPriceRatio += ratio;
+          totalCount++;
+        });
+
+        const averagePriceRatio = totalPriceRatio / totalCount;
+        const ingredientCostInDish = averagePriceRatio * ingredientWeightInDish;
+        totalIngredientCost += ingredientCostInDish;
+
+        ingredientDetails.push({
+          name: ingredientName,
+          weightInDish: ingredientWeightInDish,
+          averagePriceRatio,
+          finalCost: ingredientCostInDish,
+          contributionPercentage: (ingredientCostInDish / dish.price) * 100,
+        });
+        console.log(`    Cena średnia (price ratio): ${averagePriceRatio}`);
+        console.log(`    Koszt składnika w daniu: ${ingredientCostInDish}`);
+      }
+
+      const profitMargin = ((dish.price - totalIngredientCost) / dish.price) * 100;
+      const marginValue = dish.price - totalIngredientCost;
+      console.log(`  Całkowity koszt składników: ${totalIngredientCost}`);
+      console.log(`  Marża (%): ${profitMargin}`);
+      console.log(`  Wartość marży: ${marginValue}`);
+
+      // Dla dania zbieramy dane miesięczne dla każdego z wybranych lat
+      const yearsMonthlyData = [];
+      for (let i = 1; i <= yearsCount; i++) {
+        const year = currentYear - i;
+        const dishData = dishCountsByYear[year][dish._id]?.monthlyCounts || [0, 0, 0];
+        console.log(`  Dane miesięczne ${year} dla dania (ID: ${dish._id}): ${dishData}`);
+        yearsMonthlyData.push(dishData);
+      }
+
+      const initialOrders = dishInitialOrders[dish._id.toString()] || 0;
+      console.log(`  Początkowa liczba zamówień (ostatnie 30 dni): ${initialOrders}`);
+
+      const averageChanges = calculateAveragePercentageChangesForMultipleYears(yearsMonthlyData, initialOrders);
+      console.log(`  Średnie zmiany procentowe: ${averageChanges}`);
+
+      let projectedOrders = [initialOrders];
+      let currentOrders = initialOrders;
+
+      for (let i = 0; i < 3; i++) {
+        const clampedChange = Math.max(-50, Math.min(50, averageChanges[i] || 0));
+        const projectionStartDate = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth() + i + 1,
+          1
+        );
+        const projectionEndDate = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth() + i + 2,
+          0
+        );
+        console.log(
+          `    Miesiąc ${i + 1} - Zakres dat: od ${projectionStartDate.toISOString()} do ${projectionEndDate.toISOString()}`
+        );
+        console.log(`    Miesiąc ${i + 1}: klamrowana zmiana procentowa: ${clampedChange}%`);
+        currentOrders = currentOrders * (1 + clampedChange / 100);
+        console.log(`    Miesiąc ${i + 1}: prognozowana liczba zamówień: ${currentOrders}`);
+        projectedOrders.push(currentOrders);
+      }
+
+      const projectedRevenues = projectedOrders.map((order) => {
+        const profitPerDish = dish.price - totalIngredientCost;
+        return order * profitPerDish;
+      });
+      console.log(`  Prognozowane przychody dla kolejnych okresów: ${projectedRevenues}`);
+
+      const totalProjectedRevenue = projectedRevenues.reduce(
+        (sum, revenue) => sum + revenue,
+        0
+      );
+      console.log(`  Łączny prognozowany przychód dla dania "${dish.name}": ${totalProjectedRevenue}`);
+
+      results.push({
+        dishName: dish.name,
+        dishPrice: dish.price,
+        profitMargin,
+        marginValue,
+        totalProjectedRevenue,
+        projectedOrders,
+        projectedRevenues,
+        ingredientDetails,
+      });
+    }
+
+    // Obliczenie globalnego totalProfit (suma przychodów dla wszystkich dań)
+    const globalTotalProfit = results.reduce(
+      (sum, dish) => sum + dish.totalProjectedRevenue,
+      0
+    );
+
+    // Ranking dań wg przychodów (totalProfit) – sortujemy malejąco
+    const ranking = results
+      .map(({ dishName, totalProjectedRevenue }) => ({
+        dishName,
+        totalProfit: totalProjectedRevenue,
+      }))
+      .sort((a, b) => b.totalProfit - a.totalProfit);
+
+    console.log("Wynik prognozowania przychodów:", results);
+    console.log("Globalny Total Profit:", globalTotalProfit);
+    console.log("Ranking dań wg prognozowanego przychodu:", ranking);
+
+    return res.status(200).json({ results, ranking, globalTotalProfit });
+  } catch (err) {
+    console.error("Błąd podczas prognozowania przychodów:", err);
+    return res.status(500).json({ message: "Wystąpił błąd podczas prognozowania przychodów." });
+  }
+};
+
 
 
 exports.dishesCount = async (req, res, next) => {
@@ -1453,4 +1727,324 @@ exports.deleteIngredient = async (req, res, next) => {
       .json({ message: "Błąd podczas usuwania składnika.", error: err });
   }
 };
+
+exports.getDishRevenueByDateRange2 = async (req, res, next) => {
+  const dishId = req.params.dishId;
+  const { startDate: startDateStr, endDate: endDateStr } = req.body;
+
+  if (!startDateStr || !endDateStr) {
+    return res
+      .status(400)
+      .json({ message: "startDate oraz endDate są wymagane." });
+  }
+
+  const startDate = new Date(startDateStr);
+  const endDate = new Date(endDateStr);
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return res
+      .status(400)
+      .json({ message: "Nieprawidłowy format daty dla startDate lub endDate." });
+  }
+
+  let objectIdDishId;
+  try {
+    objectIdDishId = new mongoose.Types.ObjectId(dishId);
+  } catch (err) {
+    return res.status(400).json({ message: "Nieprawidłowy format dishId." });
+  }
+
+  try {
+    // Pobranie dania
+    const dish = await Dish.findById(objectIdDishId);
+    if (!dish) {
+      return res.status(404).json({ message: "Nie znaleziono dania." });
+    }
+    const dishPrice = dish.price;
+
+    // Obliczenie kosztu składników dla dania
+    let ingredientCostDetails = {};
+    for (const template of dish.ingredientTemplates) {
+      const weightInDish = parseFloat(template.weight);
+      const ingredient = template.ingredient;
+      const matchingIngredients = await Ingredient.find({ name: ingredient.name });
+      if (!matchingIngredients.length) continue;
+      const averagePriceRatio =
+        matchingIngredients.reduce(
+          (sum, ing) => sum + (ing.priceRatio || ing.price / ing.weight),
+          0
+        ) / matchingIngredients.length;
+      const ingredientCost = averagePriceRatio * weightInDish;
+
+      if (!ingredientCostDetails[ingredient.name]) {
+        ingredientCostDetails[ingredient.name] = { totalWeight: 0, totalCost: 0 };
+      }
+      ingredientCostDetails[ingredient.name].totalWeight += weightInDish;
+      ingredientCostDetails[ingredient.name].totalCost += ingredientCost;
+    }
+
+    const totalIngredientCost = Object.values(ingredientCostDetails).reduce(
+      (sum, item) => sum + item.totalCost,
+      0
+    );
+    const profitMarginValue = dishPrice - totalIngredientCost;
+    const profitMarginPercentage = ((profitMarginValue / dishPrice) * 100).toFixed(2);
+
+    const ingredientSummary = Object.keys(ingredientCostDetails).map((name) => {
+      const totalCost = ingredientCostDetails[name].totalCost;
+      return {
+        name,
+        totalWeight: ingredientCostDetails[name].totalWeight.toFixed(2),
+        totalCost: totalCost.toFixed(2),
+        percentageOfDishPrice: ((totalCost / dishPrice) * 100 || 0).toFixed(2),
+      };
+    });
+
+    // Pobranie zamówień zawierających danie w zadanym okresie
+    const orders = await Order.find({
+      orderDate: { $gte: startDate, $lte: endDate },
+      "dishes.dish._id": objectIdDishId,
+    });
+
+    if (!orders.length) {
+      return res.status(404).json({
+        message: "Brak zamówień zawierających to danie w zadanym okresie.",
+      });
+    }
+
+    let totalRevenue = 0;
+    let totalQuantity = 0;
+    const orderHistory = [];
+
+    // Rozbicie przychodu wg dni w zadanym okresie
+    const msInDay = 1000 * 60 * 60 * 24;
+    const dayCount = Math.floor((endDate - startDate) / msInDay) + 1;
+    const revenueByDay = Array(dayCount).fill(0);
+    const labels = [];
+    for (let i = 0; i < dayCount; i++) {
+      const day = new Date(startDate);
+      day.setDate(day.getDate() + i);
+      labels.push(day.toLocaleDateString("pl-PL"));
+    }
+
+    // Przetwarzanie zamówień
+    for (const order of orders) {
+      // Iteracja po pozycjach w zamówieniu
+      for (const dishItem of order.dishes) {
+        // Sprawdzenie, czy pozycja dotyczy danego dania
+        if (dishItem.dish._id.equals(objectIdDishId)) {
+          // Używamy wcześniej obliczonego kosztu składników (totalIngredientCost)
+          const dishProfit = dishItem.quantity * (dishPrice - totalIngredientCost);
+          totalRevenue += dishProfit;
+          totalQuantity += dishItem.quantity;
+
+          // Ustalenie indeksu dnia (w stosunku do startDate)
+          const orderDate = new Date(order.orderDate);
+          const dayIndex = Math.floor((orderDate - startDate) / msInDay);
+          if (dayIndex >= 0 && dayIndex < dayCount) {
+            revenueByDay[dayIndex] += dishProfit;
+          }
+
+          // Zbieramy historię wystąpień dania – dla każdej pozycji zamówienia
+          orderHistory.push({
+            orderId: order._id,
+            orderDate: order.orderDate,
+            quantity: dishItem.quantity,
+            dishProfit: dishProfit.toFixed(2),
+            ingredients: dish.ingredientTemplates.map((template) => ({
+              name: template.ingredient.name,
+              weight: template.weight,
+            })),
+          });
+        }
+      }
+    }
+
+    const revenueByPeriod = labels.map((label, index) => ({
+      period: label,
+      revenue: revenueByDay[index].toFixed(2),
+    }));
+
+    res.status(200).json({
+      dish,
+      totalRevenue: totalRevenue.toFixed(2),
+      totalQuantity,
+      ingredients: ingredientSummary,
+      profitMargin: {
+        value: profitMarginValue.toFixed(2),
+        percentage: profitMarginPercentage,
+      },
+      revenueByPeriod,
+      orderHistory,
+    });
+  } catch (err) {
+    console.error("Błąd podczas obliczania przychodu dla dania w zadanym okresie:", err);
+    res.status(500).json({
+      message: "Wystąpił błąd podczas obliczania przychodu dla dania.",
+    });
+  }
+};
+
+exports.getDishRevenueByDateRange = async (req, res, next) => {
+  const dishId = req.params.dishId;
+  const { startDate: startDateStr, endDate: endDateStr } = req.body;
+  console.log('hello')
+  // Jeśli startDate lub endDate nie są podane, ustaw domyślnie przedział: od roku wstecz do dziś
+  let startDate, endDate;
+  if (!startDateStr || !endDateStr) {
+    endDate = new Date();
+    startDate = new Date();
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    console.log("Używany domyślny przedział dat:", {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    });
+  } else {
+    startDate = new Date(startDateStr);
+    endDate = new Date(endDateStr);
+  }
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return res
+      .status(400)
+      .json({ message: "Nieprawidłowy format daty dla startDate lub endDate." });
+  }
+
+  let objectIdDishId;
+  try {
+    objectIdDishId = new mongoose.Types.ObjectId(dishId);
+  } catch (err) {
+    return res.status(400).json({ message: "Nieprawidłowy format dishId." });
+  }
+
+  try {
+    // Pobranie dania
+    const dish = await Dish.findById(objectIdDishId);
+    if (!dish) {
+      return res.status(404).json({ message: "Nie znaleziono dania." });
+    }
+    const dishPrice = dish.price;
+
+    // Obliczenie kosztu składników dla dania
+    let ingredientCostDetails = {};
+    for (const template of dish.ingredientTemplates) {
+      const weightInDish = parseFloat(template.weight);
+      const ingredient = template.ingredient;
+      const matchingIngredients = await Ingredient.find({ name: ingredient.name });
+      if (!matchingIngredients.length) continue;
+      const averagePriceRatio =
+        matchingIngredients.reduce(
+          (sum, ing) => sum + (ing.priceRatio || ing.price / ing.weight),
+          0
+        ) / matchingIngredients.length;
+      const ingredientCost = averagePriceRatio * weightInDish;
+
+      if (!ingredientCostDetails[ingredient.name]) {
+        ingredientCostDetails[ingredient.name] = { totalWeight: 0, totalCost: 0 };
+      }
+      ingredientCostDetails[ingredient.name].totalWeight += weightInDish;
+      ingredientCostDetails[ingredient.name].totalCost += ingredientCost;
+    }
+
+    const totalIngredientCost = Object.values(ingredientCostDetails).reduce(
+      (sum, item) => sum + item.totalCost,
+      0
+    );
+    const profitMarginValue = dishPrice - totalIngredientCost;
+    const profitMarginPercentage = ((profitMarginValue / dishPrice) * 100).toFixed(2);
+
+    const ingredientSummary = Object.keys(ingredientCostDetails).map((name) => {
+      const totalCost = ingredientCostDetails[name].totalCost;
+      return {
+        name,
+        totalWeight: ingredientCostDetails[name].totalWeight.toFixed(2),
+        totalCost: totalCost.toFixed(2),
+        percentageOfDishPrice: ((totalCost / dishPrice) * 100 || 0).toFixed(2),
+      };
+    });
+
+    // Pobranie zamówień zawierających danie w zadanym okresie
+    const orders = await Order.find({
+      orderDate: { $gte: startDate, $lte: endDate },
+      "dishes.dish._id": objectIdDishId,
+    });
+
+    if (!orders.length) {
+      return res.status(404).json({
+        message: "Brak zamówień zawierających to danie w zadanym okresie.",
+      });
+    }
+
+    let totalRevenue = 0;
+    let totalQuantity = 0;
+    const orderHistory = [];
+
+    // Rozbicie przychodu wg dni w zadanym okresie
+    const msInDay = 1000 * 60 * 60 * 24;
+    const dayCount = Math.floor((endDate - startDate) / msInDay) + 1;
+    const revenueByDay = Array(dayCount).fill(0);
+    const labels = [];
+    for (let i = 0; i < dayCount; i++) {
+      const day = new Date(startDate);
+      day.setDate(day.getDate() + i);
+      labels.push(day.toLocaleDateString("pl-PL"));
+    }
+
+    // Przetwarzanie zamówień
+    for (const order of orders) {
+      for (const dishItem of order.dishes) {
+        if (dishItem.dish._id.equals(objectIdDishId)) {
+          const dishProfit = dishItem.quantity * (dishPrice - totalIngredientCost);
+          totalRevenue += dishProfit;
+          totalQuantity += dishItem.quantity;
+
+          // Ustalenie indeksu dnia (w stosunku do startDate)
+          const orderDate = new Date(order.orderDate);
+          const dayIndex = Math.floor((orderDate - startDate) / msInDay);
+          if (dayIndex >= 0 && dayIndex < dayCount) {
+            revenueByDay[dayIndex] += dishProfit;
+          }
+
+          // Zbieranie historii wystąpień dania
+          orderHistory.push({
+            orderId: order._id,
+            orderDate: order.orderDate,
+            quantity: dishItem.quantity,
+            dishProfit: dishProfit.toFixed(2),
+            ingredients: dish.ingredientTemplates.map((template) => ({
+              name: template.ingredient.name,
+              weight: template.weight,
+            })),
+          });
+        }
+      }
+    }
+
+    const revenueByPeriod = labels.map((label, index) => ({
+      period: label,
+      revenue: revenueByDay[index].toFixed(2),
+    }));
+
+    res.status(200).json({
+      dish,
+      totalRevenue: totalRevenue.toFixed(2),
+      totalQuantity,
+      ingredients: ingredientSummary,
+      profitMargin: {
+        value: profitMarginValue.toFixed(2),
+        percentage: profitMarginPercentage,
+      },
+      revenueByPeriod,
+      orderHistory,
+      message: { message:'siema'}
+    });
+  } catch (err) {
+    console.error("Błąd podczas obliczania przychodu dla dania w zadanym okresie:", err);
+    res.status(500).json({
+      message: "Wystąpił błąd podczas obliczania przychodu dla dania.",
+    });
+  }
+};
+
+
 
