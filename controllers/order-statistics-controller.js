@@ -567,3 +567,139 @@ exports.getOrdersWithDetails = async (req, res, next) => {
       .json({ message: "Wystąpił błąd podczas pobierania zamówień." });
   }
 };
+
+
+exports.getSummary = async (req, res, next) => {
+  try {
+    // Ustal przedział dzisiejszy: od 00:00 do 23:59:59:999
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // Pobierz zamówienia z dzisiejszego dnia
+    const todaysOrders = await Order.find({
+      orderDate: { $gte: today, $lte: endOfToday },
+    });
+
+    const totalOrders = todaysOrders.length;
+    if (!totalOrders) {
+      return res.status(200).json({
+        message: "Brak zamówień dzisiaj.",
+        totalProfit: "0.00",
+        totalOrders: 0,
+        top5Earners: [],
+        top5Losers: [],
+      });
+    }
+
+    // Pobierz unikalne dishId z dzisiejszych zamówień
+    const dishIds = [
+      ...new Set(
+        todaysOrders.flatMap((order) =>
+          order.dishes.map((dishItem) => dishItem.dish._id.toString())
+        )
+      ),
+    ];
+
+    // Pobierz dane dań (master)
+    const dishes = await Dish.find({ _id: { $in: dishIds } });
+    const dishMap = {};
+    dishes.forEach((dish) => {
+      dishMap[dish._id.toString()] = dish;
+    });
+
+    // Zbierz unikalne nazwy składników występujących we wszystkich daniach
+    const ingredientNames = [
+      ...new Set(
+        dishes.flatMap((dish) =>
+          dish.ingredientTemplates.map(
+            (template) => template.ingredient.name
+          )
+        )
+      ),
+    ];
+
+    // Pobierz składniki, aby obliczyć średnią wartość priceRatio
+    const ingredients = await Ingredient.find({
+      name: { $in: ingredientNames },
+    });
+    const ingredientPriceMap = {};
+    ingredientNames.forEach((name) => {
+      const relevantIngredients = ingredients.filter(
+        (ingredient) => ingredient.name === name
+      );
+      const avgPriceRatio =
+        relevantIngredients.reduce(
+          (sum, ingredient) => sum + ingredient.priceRatio,
+          0
+        ) / relevantIngredients.length;
+      ingredientPriceMap[name] = avgPriceRatio;
+    });
+
+    let totalProfit = 0;
+    // Mapa, która dla każdego dania sumuje zysk i ilość sprzedanych porcji
+    const dishProfitMap = {}; // { dishId: { totalProfit: Number, totalQuantity: Number } }
+
+    // Przetwarzanie dzisiejszych zamówień
+    for (const order of todaysOrders) {
+      for (const dishItem of order.dishes) {
+        const dishIdStr = dishItem.dish._id.toString();
+        const dish = dishMap[dishIdStr];
+        if (!dish) continue;
+
+        // Używamy danych z pozycji zamówienia, aby uwzględnić ewentualne różnice w atrybucie weight
+        let orderSpecificIngredientCost = 0;
+        for (const template of dishItem.dish.ingredientTemplates) {
+          const ingredientName = template.ingredient.name;
+          const avgPriceRatio = ingredientPriceMap[ingredientName] || 0;
+          const weight = parseFloat(template.weight);
+          orderSpecificIngredientCost += avgPriceRatio * weight;
+        }
+
+        // Zysk dla tej pozycji
+        const dishProfit =
+          dishItem.quantity * (dishItem.dish.price - orderSpecificIngredientCost);
+        totalProfit += dishProfit;
+
+        if (!dishProfitMap[dishIdStr]) {
+          dishProfitMap[dishIdStr] = { totalProfit: 0, totalQuantity: 0 };
+        }
+        dishProfitMap[dishIdStr].totalProfit += dishProfit;
+        dishProfitMap[dishIdStr].totalQuantity += dishItem.quantity;
+      }
+    }
+
+    // Utwórz tablicę wyników dla każdego dania
+    const dishResults = Object.keys(dishProfitMap).map((dishIdStr) => {
+      const dish = dishMap[dishIdStr];
+      const { totalProfit, totalQuantity } = dishProfitMap[dishIdStr];
+      return { dish, totalProfit, totalQuantity };
+    });
+
+    // Top 5 dań – zarabiających (sortowanie malejąco wg totalProfit)
+    const top5Earners = dishResults
+      .slice()
+      .sort((a, b) => b.totalProfit - a.totalProfit)
+      .slice(0, 5);
+
+    // Top 5 dań – tracących lub o najniższym zysku (sortowanie rosnąco wg totalProfit)
+    const top5Losers = dishResults
+      .slice()
+      .sort((a, b) => a.totalProfit - b.totalProfit)
+      .slice(0, 5);
+
+    return res.status(200).json({
+      message: "Podsumowanie dzisiejsze",
+      totalProfit: totalProfit.toFixed(2),
+      totalOrders,
+      top5Earners,
+      top5Losers,
+    });
+  } catch (err) {
+    console.error("Błąd podczas pobierania podsumowania:", err);
+    return res.status(500).json({
+      message: "Wystąpił błąd podczas pobierania podsumowania.",
+    });
+  }
+};

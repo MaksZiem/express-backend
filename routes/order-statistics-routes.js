@@ -17,4 +17,8 @@ router.post('/by-day-of-week', orderStaticsController.getOrdersByDayOfWeek);
 
 router.post('/orders-with-details', orderStaticsController.getOrdersWithDetails);
 
+router.get('/summary', orderStaticsController.getSummary)
+
+
+
 module.exports = router;
