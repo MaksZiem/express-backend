@@ -19,11 +19,8 @@ const configRoutes = require('./routes/config-routes')
 const session = require('express-session');
 const MongoDBStore = require('connect-mongodb-session')(session);
 const fs = require('fs')
-const { Server } = require('socket.io'); // Import z socket.io
+const { Server } = require('socket.io'); 
 const http = require('http'); 
-const swaggerJsdoc = require('swagger-jsdoc');
-const swaggerUi = require('swagger-ui-express');
-
 
 const MONGODB_URI =
 'mongodb+srv://maximilian:Johen2001@cluster0.pyphlw1.mongodb.net/restaurant?retryWrites=true&w=majority'
@@ -34,7 +31,7 @@ const store = new MongoDBStore({
   collection: 'sessions'
 });
 
-const wsServer = http.createServer(); // Utwórz osobny serwer HTTP dla WebSocket
+const wsServer = http.createServer(); 
 const io = new Server(wsServer, {
   cors: {
     origin: 'http://localhost:3000',
@@ -47,41 +44,6 @@ app.set('io', io);
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.json());
-
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'Restaurant API Documentation',
-      version: '1.0.0',
-      description: 'API documentation for the restaurant management system',
-    },
-    servers: [
-      {
-        url: 'http://localhost:8000',
-      },
-    ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'apiKey',
-          in: 'header',
-          name: 'Authorization',
-          description: 'Provide the JWT token as "Bearer <your-token>"',
-        },
-      },
-    },
-  },
-  security: [
-    {
-      bearerAuth: [],  // Wymaga autoryzacji z tokenem dla wszystkich endpointów
-    },
-  ],
-  apis: ['./routes/*.js'],  // Ścieżki do plików z trasami
-};
-
-const swaggerDocs = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 app.get('/', (req, res) => {
   res.redirect('/auth');

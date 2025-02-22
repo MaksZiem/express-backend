@@ -575,10 +575,12 @@ exports.getDeficiency = async (req, res, next) => {
       });
     }
 
-    results.sort(
-      (a, b) =>
-        parseFloat(b.shortageProbability) - parseFloat(a.shortageProbability)
-    );
+    results.sort((a, b) => {
+      const daysA = a.daysUntilOutOfStock === "Nieskończoność" ? Infinity : parseFloat(a.daysUntilOutOfStock);
+      const daysB = b.daysUntilOutOfStock === "Nieskończoność" ? Infinity : parseFloat(b.daysUntilOutOfStock);
+      return daysA - daysB;
+    });
+    
 
     const top5Ingredients = results.slice(0, 5);
 
@@ -589,3 +591,14 @@ exports.getDeficiency = async (req, res, next) => {
       .json({ message: "Wystąpił błąd podczas obliczania." });
   }
 };
+
+
+
+
+
+
+
+
+
+
+

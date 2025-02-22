@@ -14,7 +14,7 @@ router.post('/waste/:ingredientName', ingredientStaticsController.getIngredientW
 
 router.get('/waste-propability/:ingredientName', ingredientStaticsController.calculateIngredientWasteProbability)
 
-router.get('/ingredient-deficiency', ingredientStaticsController.getDeficiency)
+router.get('/deficiency', ingredientStaticsController.getDeficiency)
 
 router.get('/ingredient-in-dishes/:ingredientName', ingredientStaticsController.getIngredientUsageInDishes)
 
