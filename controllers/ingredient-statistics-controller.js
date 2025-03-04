@@ -1,11 +1,12 @@
 const Order = require("../models/order");
 const Ingredient = require("../models/ingredient");
 const IngredientWaste = require("../models/ingredientWaste");
+const IngredientTemplate = require("../models/ingredientTemplate");
 
 exports.getIngredientUsageByPeriod = async (req, res, next) => {
   const ingredientName = req.params.ingredientName;
   const period = req.body.period || "tydzien";
-
+  console.log("strzal");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const endOfToday = new Date(today);
@@ -488,23 +489,19 @@ exports.getExpiredIngredients = async (req, res, next) => {
 
 exports.getDeficiency = async (req, res, next) => {
   try {
-    const ingredients = await Ingredient.find({});
-
-    if (!ingredients || ingredients.length === 0) {
+    const templates = await IngredientTemplate.find({});
+    if (!templates || templates.length === 0) {
       return res
         .status(404)
-        .json({ message: "Brak składników w bazie danych." });
+        .json({ message: "Brak szablonów składników w bazie danych." });
     }
 
     const today = new Date();
     const oneYearAgo = new Date(today);
     oneYearAgo.setFullYear(today.getFullYear() - 1);
 
-    const last30DaysOrders = await Order.find({
-      orderDate: { $exists: true },
-    });
-
-    const filteredOrders = last30DaysOrders.filter((order) => {
+    const orders = await Order.find({ orderDate: { $exists: true } });
+    const filteredOrders = orders.filter((order) => {
       const orderDate = new Date(order.orderDate);
       return orderDate >= oneYearAgo && orderDate < today;
     });
@@ -512,75 +509,82 @@ exports.getDeficiency = async (req, res, next) => {
     if (filteredOrders.length === 0) {
       return res
         .status(404)
-        .json({ message: "Brak zamówień z ostatnich 30 dni." });
+        .json({ message: "Brak zamówień z ostatniego roku." });
     }
 
     const results = [];
 
-    for (let ingredient of ingredients) {
-      const ingredientName = ingredient.name;
-      const totalWeightOfIngredient = ingredient.weight;
+    for (let template of templates) {
+      const templateName = template.name;
+
+      const ingredients = await Ingredient.find({ name: templateName });
+
+      const validIngredients = ingredients.filter((ing) => {
+        if (ing.expirationDate) {
+          return new Date(ing.expirationDate) >= today;
+        }
+        return true;
+      });
+
+      if (!validIngredients || validIngredients.length === 0) {
+        continue;
+      }
+
+      const totalWeightOfIngredient = validIngredients.reduce(
+        (sum, ing) => sum + parseFloat(ing.weight),
+        0
+      );
 
       let totalUsage = 0;
 
       filteredOrders.forEach((order) => {
         order.dishes.forEach((dishItem) => {
           const dish = dishItem.dish;
-
           if (!dish || !dish.ingredientTemplates || !dish.isAvailable) return;
-
           dish.ingredientTemplates.forEach((ingTemplate) => {
-            const ingredientInDish = ingTemplate.ingredient;
-
-            if (ingredientInDish.name === ingredientName) {
+            if (ingTemplate.ingredient.name === templateName) {
               totalUsage += parseFloat(ingTemplate.weight) * dishItem.quantity;
             }
           });
         });
       });
 
-      const averageDailyUsage = totalUsage / 30;
-
+      const averageDailyUsage = totalUsage / 365;
+      let daysUntilOutOfStock;
       if (averageDailyUsage === 0) {
-        results.push({
-          ingredientName: ingredientName,
-          averageDailyUsage: "0",
-          daysUntilOutOfStock: "Nieskończoność",
-          shortageProbability: "N/A",
-        });
+        daysUntilOutOfStock = "Nieskończoność";
+      } else {
+        daysUntilOutOfStock = (
+          totalWeightOfIngredient / averageDailyUsage
+        ).toFixed(2);
+      }
+
+      if (
+        daysUntilOutOfStock !== "Nieskończoność" &&
+        parseFloat(daysUntilOutOfStock) === 0
+      ) {
         continue;
       }
 
-      const daysUntilOutOfStock = totalWeightOfIngredient / averageDailyUsage;
-
-      let daysUntilExpiration = null;
-      if (ingredient.expirationDate) {
-        const expirationDate = new Date(ingredient.expirationDate);
-        daysUntilExpiration = Math.ceil(
-          (expirationDate - today) / (1000 * 60 * 60 * 24)
-        );
-      }
-
-      let shortageProbability = 0;
-      if (daysUntilOutOfStock <= daysUntilExpiration) {
-        shortageProbability =
-          (1 - daysUntilOutOfStock / daysUntilExpiration) * 100;
-      }
-
       results.push({
-        ingredientName: ingredientName,
+        ingredientName: templateName,
         averageDailyUsage: averageDailyUsage.toFixed(2),
-        daysUntilOutOfStock: daysUntilOutOfStock.toFixed(2),
-        shortageProbability: shortageProbability.toFixed(2) + "%",
+        daysUntilOutOfStock: daysUntilOutOfStock,
+        totalWeight: totalWeightOfIngredient.toFixed(2),
       });
     }
 
     results.sort((a, b) => {
-      const daysA = a.daysUntilOutOfStock === "Nieskończoność" ? Infinity : parseFloat(a.daysUntilOutOfStock);
-      const daysB = b.daysUntilOutOfStock === "Nieskończoność" ? Infinity : parseFloat(b.daysUntilOutOfStock);
+      const daysA =
+        a.daysUntilOutOfStock === "Nieskończoność"
+          ? Infinity
+          : parseFloat(a.daysUntilOutOfStock);
+      const daysB =
+        b.daysUntilOutOfStock === "Nieskończoność"
+          ? Infinity
+          : parseFloat(b.daysUntilOutOfStock);
       return daysA - daysB;
     });
-    
 
     const top5Ingredients = results.slice(0, 5);
 
@@ -591,14 +595,3 @@ exports.getDeficiency = async (req, res, next) => {
       .json({ message: "Wystąpił błąd podczas obliczania." });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
