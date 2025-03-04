@@ -257,6 +257,7 @@ exports.getIngredientWasteByPeriod = async (req, res, next) => {
   }
 };
 
+
 exports.calculateIngredientWasteProbability = async (req, res, next) => {
   try {
     const ingredientName = req.params.ingredientName;
@@ -267,120 +268,94 @@ exports.calculateIngredientWasteProbability = async (req, res, next) => {
     }
 
     const today = new Date();
-    let expirationDate = null;
 
-    const totalWeightOfIngredient = ingredients.reduce(
-      (acc, ingredient) => acc + ingredient.weight,
+    // Filtrujemy składniki – bierzemy tylko te, które nie są przeterminowane
+    const validIngredients = ingredients.filter(ing => {
+      if (ing.expirationDate) {
+        return new Date(ing.expirationDate) >= today;
+      }
+      return true;
+    });
+
+    // Obliczamy łączną wagę ważnych instancji
+    const totalWeightOfIngredient = validIngredients.reduce(
+      (sum, ing) => sum + parseFloat(ing.weight),
       0
     );
 
-    ingredients.forEach((ingredient) => {
+    // Znajdujemy najwcześniejszą datę wygaśnięcia wśród ważnych instancji (jeśli istnieje)
+    let expirationDate = null;
+    validIngredients.forEach(ingredient => {
       if (ingredient.expirationDate) {
-        const expDate = new Date(ingredient.expirationDate);
-        if (!expirationDate || expDate < expirationDate) {
-          expirationDate = expDate;
+        const exp = new Date(ingredient.expirationDate);
+        if (!expirationDate || exp < expirationDate) {
+          expirationDate = exp;
         }
       }
     });
 
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
+    // Ustawiamy zakres dat na ostatni rok
+    const oneYearAgo = new Date(today);
+    oneYearAgo.setFullYear(today.getFullYear() - 1);
 
-    const last30DaysOrders = await Order.find({
-      orderDate: { $exists: true },
-    });
-
-    console.log(thirtyDaysAgo);
-
-    const filteredOrders = last30DaysOrders.filter((order) => {
+    // Pobieramy zamówienia z ostatniego roku
+    const orders = await Order.find({ orderDate: { $exists: true } });
+    const filteredOrders = orders.filter(order => {
       const orderDate = new Date(order.orderDate);
-      return orderDate >= thirtyDaysAgo && orderDate < today;
+      return orderDate >= oneYearAgo && orderDate < today;
     });
 
     if (filteredOrders.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "Brak zamówień z ostatnich 30 dni." });
+      return res.status(404).json({ message: "Brak zamówień z ostatniego roku." });
     }
 
+    // Sumujemy zużycie składnika na podstawie zamówień
     let totalUsage = 0;
-
-    filteredOrders.forEach((order) => {
-      order.dishes.forEach((dishItem) => {
+    filteredOrders.forEach(order => {
+      order.dishes.forEach(dishItem => {
         const dish = dishItem.dish;
-
         if (!dish || !dish.ingredientTemplates || !dish.isAvailable) return;
-
-        dish.ingredientTemplates.forEach((ingTemplate) => {
-          const ingredientInDish = ingTemplate.ingredient;
-
-          if (ingredientInDish.name === ingredientName) {
+        dish.ingredientTemplates.forEach(ingTemplate => {
+          if (ingTemplate.ingredient.name === ingredientName) {
             totalUsage += parseFloat(ingTemplate.weight) * dishItem.quantity;
           }
         });
       });
     });
 
-    const averageDailyUsage = totalUsage / 30;
+    // Średnie zużycie dzienne obliczamy na podstawie 365 dni
+    const averageDailyUsage = totalUsage / 365;
 
+    // Obliczamy dni do wyczerpania zapasu
+    let daysUntilOutOfStock;
     if (averageDailyUsage === 0) {
-      return res.status(200).json({
-        message: "Składnik nie był używany w ostatnich 30 dniach.",
-        daysUntilOutOfStock: "Nieskończoność",
-        shortageProbability: "N/A",
-        wastedWeight: "0",
-        wastedValue: "0",
-        totalWeightOfIngredient: totalWeightOfIngredient.toFixed(2),
-      });
+      daysUntilOutOfStock = "Nieskończoność";
+    } else {
+      daysUntilOutOfStock = (totalWeightOfIngredient / averageDailyUsage).toFixed(2);
     }
 
-    const daysUntilOutOfStock = totalWeightOfIngredient / averageDailyUsage;
-
-    let daysUntilExpiration = null;
+    // Obliczamy dni do końca daty ważności (jeśli mamy datę)
+    let daysUntilExpiration = "Brak daty ważności";
     if (expirationDate) {
-      daysUntilExpiration = Math.ceil(
-        (expirationDate - today) / (1000 * 60 * 60 * 24)
-      );
-    }
-
-    let shortageProbability = 0;
-    if (daysUntilOutOfStock <= daysUntilExpiration) {
-      shortageProbability =
-        (1 - daysUntilOutOfStock / daysUntilExpiration) * 100;
-    }
-
-    let wastedWeight = 0;
-    let wastedValue = 0;
-
-    if (daysUntilExpiration && daysUntilOutOfStock > daysUntilExpiration) {
-      wastedWeight = Math.max(
-        0,
-        averageDailyUsage * (daysUntilOutOfStock - daysUntilExpiration)
-      );
-      wastedWeight = Math.min(wastedWeight, totalWeightOfIngredient);
-      const priceRatio = ingredients[0].priceRatio || 0;
-      wastedValue = wastedWeight * priceRatio;
+      daysUntilExpiration = Math.ceil((expirationDate - today) / (1000 * 60 * 60 * 24));
+      if (daysUntilExpiration < 0) {
+        daysUntilExpiration = 0;
+      }
+      daysUntilExpiration = daysUntilExpiration.toString();
     }
 
     return res.status(200).json({
       ingredientName: ingredientName,
       averageDailyUsage: averageDailyUsage.toFixed(2),
-      daysUntilOutOfStock: daysUntilOutOfStock.toFixed(2),
-      daysUntilExpiration:
-        daysUntilExpiration !== null
-          ? daysUntilExpiration.toFixed(2)
-          : "Brak daty wygaśnięcia",
-      shortageProbability: shortageProbability.toFixed(2) + "%",
-      wastedWeight: wastedWeight.toFixed(2),
-      wastedValue: wastedValue.toFixed(2),
-      totalWeightOfIngredient: totalWeightOfIngredient.toFixed(2),
+      daysUntilOutOfStock: daysUntilOutOfStock,
+      daysUntilExpiration: daysUntilExpiration,
+      totalWeightOfIngredient: totalWeightOfIngredient.toFixed(2)
     });
   } catch (err) {
-    return res
-      .status(500)
-      .json({ message: "Wystąpił błąd podczas obliczania." });
+    return res.status(500).json({ message: "Wystąpił błąd podczas obliczania." });
   }
 };
+
 
 exports.getIngredientUsageInDishes = async (req, res) => {
   const ingredientName = req.params.ingredientName;
