@@ -31,6 +31,7 @@ exports.getAllIngredientTemplates = (req, res, next) => {
     });
 };
 
+
 exports.getIngredientsByName = async (req, res, next) => {
   const ingredientName = req.params.name;
   const oneYearAgo = new Date();
@@ -43,12 +44,10 @@ exports.getIngredientsByName = async (req, res, next) => {
     }).sort({ expirationDate: -1 });
 
     if (ingredients.length === 0) {
-      return res
-        .status(404)
-        .json({
-          message:
-            "Nie znaleziono żadnych składników o podanej nazwie w ciągu ostatnich 365 dni.",
-        });
+      return res.status(404).json({
+        message:
+          "Nie znaleziono żadnych składników o podanej nazwie w ciągu ostatnich 365 dni.",
+      });
     }
 
     let totalDaysToExpire = 0;
@@ -60,10 +59,17 @@ exports.getIngredientsByName = async (req, res, next) => {
     });
 
     const averageDaysToExpire = totalDaysToExpire / ingredients.length;
-    const predictedExpirationDate = new Date();
+    // Używamy 'let', aby móc modyfikować predictedExpirationDate
+    let predictedExpirationDate = new Date();
     predictedExpirationDate.setDate(
       predictedExpirationDate.getDate() + averageDaysToExpire
     );
+
+    // Jeśli predictedExpirationDate jest w przeszłości, ustawiamy na dzisiejszą datę
+    const today = new Date();
+    if (predictedExpirationDate < today) {
+      predictedExpirationDate = today;
+    }
 
     const formattedExpirationDate = `${predictedExpirationDate
       .getDate()
@@ -76,7 +82,9 @@ exports.getIngredientsByName = async (req, res, next) => {
       predictedExpirationDate: formattedExpirationDate,
       ingredients: ingredients.map((ingredient) => ({
         ...ingredient.toObject({ getters: true }),
-        expirationDate: ingredient.expirationDate.toISOString().slice(0, 10),
+        expirationDate: ingredient.expirationDate
+          .toISOString()
+          .slice(0, 10),
       })),
     });
   } catch (err) {
@@ -86,6 +94,7 @@ exports.getIngredientsByName = async (req, res, next) => {
     );
   }
 };
+
 
 exports.createIngredientTemplate = async (req, res, next) => {
   const errors = validationResult(req);
@@ -222,39 +231,6 @@ exports.getZeroWeightIngredients = async (req, res, next) => {
 };
 
 
-exports.getDishOrdersLast30Days = async (req, res, next) => {
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-  const startDate = new Date(today);
-  startDate.setDate(today.getDate() - 30);
-  startDate.setHours(0, 0, 0, 0);
-
-  console.log('uzyte')
-
-  try {
-    const orders = await Order.find({
-      orderDate: { $gte: startDate, $lte: today },
-    });
-
-    const dishCounts = {};
-
-    orders.forEach((order) => {
-      order.dishes.forEach((dish) => {
-        const dishId = dish.dish._id.toString();
-        dishCounts[dishId] = (dishCounts[dishId] || 0) + dish.quantity;
-      });
-    });
-
-    console.log('git')
-    res.status(200).json({
-      message: "Ilość zamówień dla każdego dania z ostatnich 30 dni.",
-      dishCounts,
-    });
-  } catch (err) {
-    console.error("Błąd podczas pobierania statystyk zamówień:", err);
-    res.status(500).json({ message: "Wystąpił błąd podczas pobierania danych." });
-  }
-};
 
 
 
