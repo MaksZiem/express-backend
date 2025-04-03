@@ -93,7 +93,7 @@ exports.getMostPopularDishes = (req, res, next) => {
 
 exports.getDishPercentage = (req, res, next) => {
   const period = req.body.periodPercentage || "tydzien";
-  console.log('przychod')
+  console.log("przychod");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -105,7 +105,7 @@ exports.getDishPercentage = (req, res, next) => {
       break;
     case "rok":
       startDate = new Date(today);
-      startDate.setMonth(today.getMonth() - 11); // 12 miesięcy wstecz
+      startDate.setMonth(today.getMonth() - 11);
       startDate.setDate(1);
       break;
     case "tydzien":
@@ -160,8 +160,6 @@ exports.getDishPercentage = (req, res, next) => {
       res.status(500).json({ message: "Wystąpił błąd." });
     });
 };
-
-
 
 exports.getOrdersStats = (req, res, next) => {
   const today = new Date();
@@ -253,16 +251,14 @@ exports.getOrdersStats = (req, res, next) => {
       });
   } else if (period === "tydzien") {
     startDate = new Date(today);
-    startDate.setDate(today.getDate() - 6); // startujemy od 6 dni wcześniej
+    startDate.setDate(today.getDate() - 6);
 
-    // Generowanie etykiet od niedzieli
     labels = Array.from({ length: 7 }, (_, i) => {
       const day = new Date(startDate);
       day.setDate(startDate.getDate() + i);
       return day.toLocaleDateString("pl-PL", { weekday: "short" });
     });
 
-    // Inicjalizowanie tablicy z zerami na dane
     dataCount = Array(7).fill(0);
 
     Order.find({ orderDate: { $gte: startDate, $lte: today } })
@@ -272,13 +268,10 @@ exports.getOrdersStats = (req, res, next) => {
           orderDate.setHours(0, 0, 0, 0);
 
           if (orderDate >= startDate && orderDate <= today) {
-            // Obliczamy dzień tygodnia (0 - niedziela, 6 - sobota)
-            // const dayOfWeek = orderDate.getDay(); // 0 to niedziela, 6 to sobota
-            // dataCount[dayOfWeek]++; // Zwiększamy licznik dla odpowiedniego dnia tygodnia
             const daysAgo = Math.floor(
               (today - orderDate) / (1000 * 60 * 60 * 24)
             );
-            const dayIndex = 6 - daysAgo; // Ostatni dzień to indeks 6, wcześniejsze idą wstecz
+            const dayIndex = 6 - daysAgo;
             if (dayIndex >= 0 && dayIndex < 7) {
               dataCount[dayIndex]++;
             }
@@ -311,7 +304,7 @@ exports.getTotalProfit = async (req, res, next) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    console.log('procenty')
+    console.log("procenty");
     let startDate;
     const period = req.body.periodPercentage || "tydzien";
 
@@ -323,7 +316,7 @@ exports.getTotalProfit = async (req, res, next) => {
       startDate.setDate(1);
     } else if (period === "rok") {
       startDate = new Date(today);
-      startDate.setMonth(today.getMonth() - 11); // 12 miesięcy wstecz
+      startDate.setMonth(today.getMonth() - 11);
       startDate.setDate(1);
     } else {
       return res.status(400).json({
@@ -342,8 +335,6 @@ exports.getTotalProfit = async (req, res, next) => {
       `Znalezione zamówienia z okresu '${period}':`,
       recentOrders.length
     );
-
-    // console.log(recentOrders)
 
     const dishIds = [
       ...new Set(
@@ -375,7 +366,7 @@ exports.getTotalProfit = async (req, res, next) => {
       const relevantIngredients = ingredients.filter(
         (ingredient) => ingredient.name === name
       );
-      // Obliczamy średnią priceRatio dla składników
+
       const avgPriceRatio =
         relevantIngredients.reduce(
           (sum, ingredient) => sum + ingredient.priceRatio,
@@ -396,24 +387,18 @@ exports.getTotalProfit = async (req, res, next) => {
 
         let totalIngredientCost = 0;
 
-        // Obliczanie kosztu składników na podstawie średniej priceRatio i wagi w daniu
         for (const template of ingredientTemplates) {
           const ingredient = template.ingredient;
           const avgPriceRatio = ingredientPriceMap[ingredient.name];
 
-          // Mnożymy priceRatio przez wagę składnika w daniu
-          const weightInDish = parseFloat(template.weight); // waga składnika w danym daniu
+          const weightInDish = parseFloat(template.weight);
           const ingredientCostForDish = avgPriceRatio * weightInDish;
           totalIngredientCost += ingredientCostForDish;
         }
 
-        // Obliczanie zysku z dania: cena dania - koszt składników
         const dishProfit =
           (dishPrice - totalIngredientCost) * dishItem.quantity;
         totalProfit += dishProfit;
-
-        // Debugowanie kosztu składników
-        // console.log(`Koszt składników dla dania: ${dishItem + totalIngredientCost}`);
       }
     }
 
@@ -431,7 +416,6 @@ exports.getTotalProfit = async (req, res, next) => {
   }
 };
 
-
 exports.getOrdersByDayOfWeek = async (req, res, next) => {
   try {
     const today = new Date();
@@ -447,9 +431,8 @@ exports.getOrdersByDayOfWeek = async (req, res, next) => {
       startDate = new Date(today);
       startDate.setDate(1);
     } else if (period === "rok") {
-      // startDate = new Date(today.getFullYear(), 0, 1);
       startDate = new Date(today);
-      startDate.setMonth(today.getMonth() - 11); // 12 miesięcy wstecz
+      startDate.setMonth(today.getMonth() - 11);
       startDate.setDate(1);
     } else {
       return res.status(400).json({
@@ -568,16 +551,13 @@ exports.getOrdersWithDetails = async (req, res, next) => {
   }
 };
 
-
 exports.getSummary = async (req, res, next) => {
   try {
-    // Ustal przedział dzisiejszy: od 00:00 do 23:59:59:999
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
-    // Pobierz zamówienia z dzisiejszego dnia
     const todaysOrders = await Order.find({
       orderDate: { $gte: today, $lte: endOfToday },
     });
@@ -593,7 +573,6 @@ exports.getSummary = async (req, res, next) => {
       });
     }
 
-    // Pobierz unikalne dishId z dzisiejszych zamówień
     const dishIds = [
       ...new Set(
         todaysOrders.flatMap((order) =>
@@ -602,25 +581,20 @@ exports.getSummary = async (req, res, next) => {
       ),
     ];
 
-    // Pobierz dane dań (master)
     const dishes = await Dish.find({ _id: { $in: dishIds } });
     const dishMap = {};
     dishes.forEach((dish) => {
       dishMap[dish._id.toString()] = dish;
     });
 
-    // Zbierz unikalne nazwy składników występujących we wszystkich daniach
     const ingredientNames = [
       ...new Set(
         dishes.flatMap((dish) =>
-          dish.ingredientTemplates.map(
-            (template) => template.ingredient.name
-          )
+          dish.ingredientTemplates.map((template) => template.ingredient.name)
         )
       ),
     ];
 
-    // Pobierz składniki, aby obliczyć średnią wartość priceRatio
     const ingredients = await Ingredient.find({
       name: { $in: ingredientNames },
     });
@@ -638,17 +612,15 @@ exports.getSummary = async (req, res, next) => {
     });
 
     let totalProfit = 0;
-    // Mapa, która dla każdego dania sumuje zysk i ilość sprzedanych porcji
-    const dishProfitMap = {}; // { dishId: { totalProfit: Number, totalQuantity: Number } }
 
-    // Przetwarzanie dzisiejszych zamówień
+    const dishProfitMap = {};
+
     for (const order of todaysOrders) {
       for (const dishItem of order.dishes) {
         const dishIdStr = dishItem.dish._id.toString();
         const dish = dishMap[dishIdStr];
         if (!dish) continue;
 
-        // Używamy danych z pozycji zamówienia, aby uwzględnić ewentualne różnice w atrybucie weight
         let orderSpecificIngredientCost = 0;
         for (const template of dishItem.dish.ingredientTemplates) {
           const ingredientName = template.ingredient.name;
@@ -657,9 +629,9 @@ exports.getSummary = async (req, res, next) => {
           orderSpecificIngredientCost += avgPriceRatio * weight;
         }
 
-        // Zysk dla tej pozycji
         const dishProfit =
-          dishItem.quantity * (dishItem.dish.price - orderSpecificIngredientCost);
+          dishItem.quantity *
+          (dishItem.dish.price - orderSpecificIngredientCost);
         totalProfit += dishProfit;
 
         if (!dishProfitMap[dishIdStr]) {
@@ -670,20 +642,17 @@ exports.getSummary = async (req, res, next) => {
       }
     }
 
-    // Utwórz tablicę wyników dla każdego dania
     const dishResults = Object.keys(dishProfitMap).map((dishIdStr) => {
       const dish = dishMap[dishIdStr];
       const { totalProfit, totalQuantity } = dishProfitMap[dishIdStr];
       return { dish, totalProfit, totalQuantity };
     });
 
-    // Top 5 dań – zarabiających (sortowanie malejąco wg totalProfit)
     const top5Earners = dishResults
       .slice()
       .sort((a, b) => b.totalProfit - a.totalProfit)
       .slice(0, 5);
 
-    // Top 5 dań – tracących lub o najniższym zysku (sortowanie rosnąco wg totalProfit)
     const top5Losers = dishResults
       .slice()
       .sort((a, b) => a.totalProfit - b.totalProfit)
