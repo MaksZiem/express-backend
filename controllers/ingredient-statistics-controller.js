@@ -3,23 +3,282 @@ const Ingredient = require("../models/ingredient");
 const IngredientWaste = require("../models/ingredientWaste");
 const IngredientTemplate = require("../models/ingredientTemplate");
 
+// exports.getIngredientUsageByPeriod = async (req, res, next) => {
+//   const ingredientName = req.params.ingredientName;
+//   const period = req.body.period || "tydzien";
+//   console.log("strzal");
+//   const today = new Date();
+//   today.setHours(0, 0, 0, 0);
+//   const endOfToday = new Date(today);
+//   endOfToday.setHours(23, 59, 59, 999);
+
+//   let startDate;
+//   if (period === "tydzien") {
+//     startDate = new Date(today);
+//     startDate.setDate(today.getDate() - 6);
+//   } else if (period === "miesiac") {
+//     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+//   } else if (period === "rok") {
+//     startDate = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+//   } else {
+//     return res.status(400).json({
+//       message: "Invalid period. Choose 'tydzien', 'miesiac', or 'rok'.",
+//     });
+//   }
+
+//   try {
+//     const orders = await Order.find({
+//       orderDate: { $gte: startDate, $lte: endOfToday },
+//     });
+
+//     if (orders.length === 0) {
+//       return res
+//         .status(404)
+//         .json({ message: "Brak zamówień w wybranym okresie." });
+//     }
+
+//     let usageData = [];
+//     let labels = [];
+//     let totalUsage = 0;
+
+//     if (period === "tydzien") {
+//       usageData = Array(7).fill(0);
+//       labels = Array.from({ length: 7 }, (_, i) => {
+//         const day = new Date(today);
+//         day.setDate(today.getDate() - (6 - i));
+//         return day.getDate().toString();
+//       });
+
+//       orders.forEach((order) => {
+//         const orderDate = new Date(order.orderDate);
+//         const daysAgo = Math.floor(
+//           (endOfToday - orderDate) / (1000 * 60 * 60 * 24)
+//         );
+
+//         if (daysAgo >= 0 && daysAgo < 7) {
+//           const dayIndex = 6 - daysAgo;
+
+//           order.dishes.forEach((dishItem) => {
+//             const dish = dishItem.dish;
+//             if (!dish || !dish.ingredientTemplates) return;
+
+//             dish.ingredientTemplates.forEach((ingTemplate) => {
+//               if (ingTemplate.ingredient.name === ingredientName) {
+//                 const ingredientUsage =
+//                   parseFloat(ingTemplate.weight) * dishItem.quantity;
+//                 usageData[dayIndex] += ingredientUsage;
+//                 totalUsage += ingredientUsage;
+//               }
+//             });
+//           });
+//         }
+//       });
+//     } else if (period === "miesiac") {
+//       const daysInMonth = new Date(
+//         today.getFullYear(),
+//         today.getMonth() + 1,
+//         0
+//       ).getDate();
+//       usageData = Array(daysInMonth).fill(0);
+//       labels = Array.from({ length: daysInMonth }, (_, i) =>
+//         (i + 1).toString()
+//       );
+
+//       orders.forEach((order) => {
+//         const orderDate = new Date(order.orderDate);
+//         const dayIndex = orderDate.getDate() - 1;
+
+//         order.dishes.forEach((dishItem) => {
+//           const dish = dishItem.dish;
+//           if (!dish || !dish.ingredientTemplates) return;
+
+//           dish.ingredientTemplates.forEach((ingTemplate) => {
+//             if (ingTemplate.ingredient.name === ingredientName) {
+//               const ingredientUsage =
+//                 parseFloat(ingTemplate.weight) * dishItem.quantity;
+//               usageData[dayIndex] += ingredientUsage;
+//               totalUsage += ingredientUsage;
+//             }
+//           });
+//         });
+//       });
+//     } else if (period === "rok") {
+//       usageData = Array(12).fill(0);
+//       labels = [];
+//       for (let i = 0; i < 12; i++) {
+//         const monthIndex = (today.getMonth() - i + 12) % 12;
+//         labels.unshift(monthIndex + 1);
+//       }
+
+//       orders.forEach((order) => {
+//         const orderDate = new Date(order.orderDate);
+//         const diffMonths =
+//           (orderDate.getFullYear() - startDate.getFullYear()) * 12 +
+//           orderDate.getMonth() -
+//           startDate.getMonth();
+//         if (diffMonths >= 0 && diffMonths < 12) {
+//           order.dishes.forEach((dishItem) => {
+//             const dish = dishItem.dish;
+//             if (!dish || !dish.ingredientTemplates) return;
+
+//             dish.ingredientTemplates.forEach((ingTemplate) => {
+//               if (ingTemplate.ingredient.name === ingredientName) {
+//                 const ingredientUsage =
+//                   parseFloat(ingTemplate.weight) * dishItem.quantity;
+//                 usageData[diffMonths] += ingredientUsage;
+//                 totalUsage += ingredientUsage;
+//               }
+//             });
+//           });
+//         }
+//       });
+//     }
+
+//     res.status(200).json({
+//       ingredientName: ingredientName,
+//       totalUsage: totalUsage.toFixed(2),
+//       usageByPeriod: usageData.map((usage, index) => ({
+//         period: labels[index],
+//         usage: usage.toFixed(2),
+//       })),
+//     });
+//   } catch (err) {
+//     console.error("Błąd podczas obliczania zużycia składnika:", err);
+//     res
+//       .status(500)
+//       .json({ message: "Wystąpił błąd podczas obliczania zużycia składnika." });
+//   }
+// };
+
+// exports.getIngredientWasteByPeriod = async (req, res, next) => {
+//   const ingredientName = req.params.ingredientName;
+//   const period = req.body.period || "miesiac";
+
+//   const today = new Date();
+//   today.setHours(23, 59, 59, 999);
+//   let startDate;
+//   let labels = [];
+//   let dataCount = [];
+
+//   if (period === "tydzien") {
+//     startDate = new Date(today);
+//     startDate.setDate(today.getDate() - 6);
+//     startDate.setHours(0, 0, 0, 0);
+//     labels = Array.from({ length: 7 }, (_, i) => {
+//       const day = new Date(today);
+//       day.setDate(today.getDate() - (6 - i));
+//       return day.getDate().toString();
+//     });
+
+//     dataCount = Array(7).fill(0);
+//   } else if (period === "miesiac") {
+//     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+//     const daysInMonth = new Date(
+//       today.getFullYear(),
+//       today.getMonth() + 1,
+//       0
+//     ).getDate();
+//     labels = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString());
+//     dataCount = Array(daysInMonth).fill(0);
+//   } else if (period === "rok") {
+//     startDate = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+//     labels = Array.from({ length: 12 }, (_, i) => {
+//       const monthIndex = (today.getMonth() - 11 + i + 12) % 12;
+//       return monthIndex + 1;
+//     });
+//     dataCount = Array(12).fill(0);
+//   } else {
+//     return res.status(400).json({
+//       message: "Invalid period. Choose 'tydzien', 'miesiac', or 'rok'.",
+//     });
+//   }
+
+//   try {
+//     const wasteEntries = await IngredientWaste.find({
+//       name: ingredientName,
+//       expirationDate: { $gte: startDate, $lte: today },
+//     });
+
+//     wasteEntries.forEach((entry) => {
+//       const entryDate = new Date(entry.expirationDate);
+//       entryDate.setHours(0, 0, 0, 0);
+//       const pricePerGram = entry.priceRatio || entry.price / entry.weight;
+//       const lossValue = entry.weight * pricePerGram;
+
+//       if (period === "tydzien") {
+//         const daysAgo = Math.floor((today - entryDate) / (1000 * 60 * 60 * 24));
+//         const dayIndex = 6 - daysAgo;
+//         if (dayIndex >= 0 && dayIndex < dataCount.length) {
+//           dataCount[dayIndex] += lossValue;
+//         }
+//       } else if (period === "miesiac") {
+//         const dayIndex = entryDate.getDate() - 1;
+//         if (dayIndex < dataCount.length) {
+//           dataCount[dayIndex] += lossValue;
+//         }
+//       } else if (period === "rok") {
+//         const diffMonths =
+//           (entryDate.getFullYear() - startDate.getFullYear()) * 12 +
+//           entryDate.getMonth() -
+//           startDate.getMonth();
+//         const monthIndex = (diffMonths + 12) % 12;
+//         if (monthIndex < dataCount.length) {
+//           dataCount[monthIndex] += lossValue;
+//         }
+//       }
+//     });
+
+//     const responseData = {
+//       ingredientName: ingredientName,
+//       totalWeightLoss: wasteEntries
+//         .reduce((acc, entry) => acc + entry.weight, 0)
+//         .toFixed(2),
+//       totalValueLoss: wasteEntries
+//         .reduce(
+//           (acc, entry) =>
+//             acc +
+//             entry.weight * (entry.priceRatio || entry.price / entry.weight),
+//           0
+//         )
+//         .toFixed(2),
+//       period: period,
+//       usageByPeriod: labels.map((label, index) => ({
+//         period: label,
+//         usage: dataCount[index].toFixed(2),
+//       })),
+//     };
+
+//     res.status(200).json(responseData);
+//   } catch (err) {
+//     console.error("Błąd podczas obliczania strat składnika:", err);
+//     res
+//       .status(500)
+//       .json({ message: "Wystąpił błąd podczas obliczania strat składnika." });
+//   }
+// };
+
 exports.getIngredientUsageByPeriod = async (req, res, next) => {
   const ingredientName = req.params.ingredientName;
   const period = req.body.period || "tydzien";
-  console.log("strzal");
+  console.log(period);
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const endOfToday = new Date(today);
+  const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
 
   let startDate;
+  
+  // Ujednolicona logika okresu czasowego
   if (period === "tydzien") {
     startDate = new Date(today);
     startDate.setDate(today.getDate() - 6);
   } else if (period === "miesiac") {
     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
   } else if (period === "rok") {
-    startDate = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+    startDate = new Date(today);
+    startDate.setMonth(today.getMonth() - 11);
+    startDate.setDate(1);
   } else {
     return res.status(400).json({
       message: "Invalid period. Choose 'tydzien', 'miesiac', or 'rok'.",
@@ -28,14 +287,8 @@ exports.getIngredientUsageByPeriod = async (req, res, next) => {
 
   try {
     const orders = await Order.find({
-      orderDate: { $gte: startDate, $lte: endOfToday },
+      orderDate: { $gte: startDate, $lt: endOfToday },
     });
-
-    if (orders.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "Brak zamówień w wybranym okresie." });
-    }
 
     let usageData = [];
     let labels = [];
@@ -43,21 +296,22 @@ exports.getIngredientUsageByPeriod = async (req, res, next) => {
 
     if (period === "tydzien") {
       usageData = Array(7).fill(0);
-      labels = Array.from({ length: 7 }, (_, i) => {
-        const day = new Date(today);
-        day.setDate(today.getDate() - (6 - i));
-        return day.getDate().toString();
-      });
+      labels = Array(7);
+      
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(startDate);
+        day.setDate(startDate.getDate() + i);
+        labels[i] = day.toLocaleDateString("pl-PL", { weekday: "short" });
+      }
 
       orders.forEach((order) => {
         const orderDate = new Date(order.orderDate);
         const daysAgo = Math.floor(
-          (endOfToday - orderDate) / (1000 * 60 * 60 * 24)
+          (orderDate - startDate) / (1000 * 60 * 60 * 24)
         );
+        const dayIndex = daysAgo;
 
-        if (daysAgo >= 0 && daysAgo < 7) {
-          const dayIndex = 6 - daysAgo;
-
+        if (dayIndex >= 0 && dayIndex < 7) {
           order.dishes.forEach((dishItem) => {
             const dish = dishItem.dish;
             if (!dish || !dish.ingredientTemplates) return;
@@ -88,35 +342,7 @@ exports.getIngredientUsageByPeriod = async (req, res, next) => {
         const orderDate = new Date(order.orderDate);
         const dayIndex = orderDate.getDate() - 1;
 
-        order.dishes.forEach((dishItem) => {
-          const dish = dishItem.dish;
-          if (!dish || !dish.ingredientTemplates) return;
-
-          dish.ingredientTemplates.forEach((ingTemplate) => {
-            if (ingTemplate.ingredient.name === ingredientName) {
-              const ingredientUsage =
-                parseFloat(ingTemplate.weight) * dishItem.quantity;
-              usageData[dayIndex] += ingredientUsage;
-              totalUsage += ingredientUsage;
-            }
-          });
-        });
-      });
-    } else if (period === "rok") {
-      usageData = Array(12).fill(0);
-      labels = [];
-      for (let i = 0; i < 12; i++) {
-        const monthIndex = (today.getMonth() - i + 12) % 12;
-        labels.unshift(monthIndex + 1);
-      }
-
-      orders.forEach((order) => {
-        const orderDate = new Date(order.orderDate);
-        const diffMonths =
-          (orderDate.getFullYear() - startDate.getFullYear()) * 12 +
-          orderDate.getMonth() -
-          startDate.getMonth();
-        if (diffMonths >= 0 && diffMonths < 12) {
+        if (dayIndex >= 0 && dayIndex < usageData.length) {
           order.dishes.forEach((dishItem) => {
             const dish = dishItem.dish;
             if (!dish || !dish.ingredientTemplates) return;
@@ -125,7 +351,39 @@ exports.getIngredientUsageByPeriod = async (req, res, next) => {
               if (ingTemplate.ingredient.name === ingredientName) {
                 const ingredientUsage =
                   parseFloat(ingTemplate.weight) * dishItem.quantity;
-                usageData[diffMonths] += ingredientUsage;
+                usageData[dayIndex] += ingredientUsage;
+                totalUsage += ingredientUsage;
+              }
+            });
+          });
+        }
+      });
+    } else if (period === "rok") {
+      usageData = Array(12).fill(0);
+      labels = Array.from({ length: 12 }, (_, i) =>
+        new Date(
+          today.getFullYear(),
+          (today.getMonth() + i + 1) % 12,
+          1
+        ).toLocaleDateString("pl-PL", {
+          month: "short",
+        })
+      );
+
+      orders.forEach((order) => {
+        const orderDate = new Date(order.orderDate);
+        const monthIndex = (orderDate.getMonth() - startDate.getMonth() + 12) % 12;
+        
+        if (monthIndex >= 0 && monthIndex < usageData.length) {
+          order.dishes.forEach((dishItem) => {
+            const dish = dishItem.dish;
+            if (!dish || !dish.ingredientTemplates) return;
+
+            dish.ingredientTemplates.forEach((ingTemplate) => {
+              if (ingTemplate.ingredient.name === ingredientName) {
+                const ingredientUsage =
+                  parseFloat(ingTemplate.weight) * dishItem.quantity;
+                usageData[monthIndex] += ingredientUsage;
                 totalUsage += ingredientUsage;
               }
             });
@@ -155,24 +413,30 @@ exports.getIngredientWasteByPeriod = async (req, res, next) => {
   const period = req.body.period || "miesiac";
 
   const today = new Date();
-  today.setHours(23, 59, 59, 999);
+  today.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  
   let startDate;
   let labels = [];
   let dataCount = [];
 
+  // Ujednolicona logika okresu czasowego
   if (period === "tydzien") {
     startDate = new Date(today);
     startDate.setDate(today.getDate() - 6);
-    startDate.setHours(0, 0, 0, 0);
-    labels = Array.from({ length: 7 }, (_, i) => {
-      const day = new Date(today);
-      day.setDate(today.getDate() - (6 - i));
-      return day.getDate().toString();
-    });
-
+    
     dataCount = Array(7).fill(0);
+    labels = Array(7);
+    
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startDate);
+      day.setDate(startDate.getDate() + i);
+      labels[i] = day.toLocaleDateString("pl-PL", { weekday: "short" });
+    }
   } else if (period === "miesiac") {
     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    
     const daysInMonth = new Date(
       today.getFullYear(),
       today.getMonth() + 1,
@@ -181,12 +445,20 @@ exports.getIngredientWasteByPeriod = async (req, res, next) => {
     labels = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString());
     dataCount = Array(daysInMonth).fill(0);
   } else if (period === "rok") {
-    startDate = new Date(today.getFullYear(), today.getMonth() - 11, 1);
-    labels = Array.from({ length: 12 }, (_, i) => {
-      const monthIndex = (today.getMonth() - 11 + i + 12) % 12;
-      return monthIndex + 1;
-    });
+    startDate = new Date(today);
+    startDate.setMonth(today.getMonth() - 11);
+    startDate.setDate(1);
+    
     dataCount = Array(12).fill(0);
+    labels = Array.from({ length: 12 }, (_, i) =>
+      new Date(
+        today.getFullYear(),
+        (today.getMonth() + i + 1) % 12,
+        1
+      ).toLocaleDateString("pl-PL", {
+        month: "short",
+      })
+    );
   } else {
     return res.status(400).json({
       message: "Invalid period. Choose 'tydzien', 'miesiac', or 'rok'.",
@@ -196,33 +468,33 @@ exports.getIngredientWasteByPeriod = async (req, res, next) => {
   try {
     const wasteEntries = await IngredientWaste.find({
       name: ingredientName,
-      expirationDate: { $gte: startDate, $lte: today },
+      expirationDate: { $gte: startDate, $lt: endOfToday },
     });
 
     wasteEntries.forEach((entry) => {
       const entryDate = new Date(entry.expirationDate);
-      entryDate.setHours(0, 0, 0, 0);
       const pricePerGram = entry.priceRatio || entry.price / entry.weight;
       const lossValue = entry.weight * pricePerGram;
 
       if (period === "tydzien") {
-        const daysAgo = Math.floor((today - entryDate) / (1000 * 60 * 60 * 24));
-        const dayIndex = 6 - daysAgo;
+        const daysAgo = Math.floor(
+          (entryDate - startDate) / (1000 * 60 * 60 * 24)
+        );
+        const dayIndex = daysAgo;
+        
         if (dayIndex >= 0 && dayIndex < dataCount.length) {
           dataCount[dayIndex] += lossValue;
         }
       } else if (period === "miesiac") {
         const dayIndex = entryDate.getDate() - 1;
-        if (dayIndex < dataCount.length) {
+        
+        if (dayIndex >= 0 && dayIndex < dataCount.length) {
           dataCount[dayIndex] += lossValue;
         }
       } else if (period === "rok") {
-        const diffMonths =
-          (entryDate.getFullYear() - startDate.getFullYear()) * 12 +
-          entryDate.getMonth() -
-          startDate.getMonth();
-        const monthIndex = (diffMonths + 12) % 12;
-        if (monthIndex < dataCount.length) {
+        const monthIndex = (entryDate.getMonth() - startDate.getMonth() + 12) % 12;
+        
+        if (monthIndex >= 0 && monthIndex < dataCount.length) {
           dataCount[monthIndex] += lossValue;
         }
       }

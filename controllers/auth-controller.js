@@ -18,7 +18,7 @@ exports.getUsers = async (req, res, next) => {
       .limit(limit);
   } catch (err) {
     const error = new HttpError(
-      'Fetching users failed, please try again later.',
+      'Pobieranie użytkowników nie powiodło się, spróbuj ponownie później.',
       500
     );
     return next(error);
@@ -36,7 +36,7 @@ exports.signup = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return next(
-      new HttpError('Invalid inputs passed, please check your data.', 422)
+      new HttpError('Nieprawidłowe dane wejściowe, sprawdź wprowadzone informacje.', 422)
     );
   }
 
@@ -47,7 +47,7 @@ exports.signup = async (req, res, next) => {
     existingUser = await User.findOne({ email: email });
   } catch (err) {
     const error = new HttpError(
-      'Signing up failed, please try again later.',
+      'Rejestracja nie powiodła się, spróbuj ponownie później.',
       500
     );
     return next(error);
@@ -55,7 +55,7 @@ exports.signup = async (req, res, next) => {
 
   if (existingUser) {
     const error = new HttpError(
-      'User exists already, please login instead.',
+      'Użytkownik już istnieje, zaloguj się zamiast tego.',
       422
     );
     return next(error);
@@ -65,7 +65,7 @@ exports.signup = async (req, res, next) => {
   try {
     hashPass = await bcrypt.hash(password, 12)
   } catch (err) {
-    const error = new HttpError('Could not create user with this password', 500)
+    const error = new HttpError('Nie można utworzyć użytkownika z tym hasłem', 500)
     return next(error)
   }
 
@@ -86,7 +86,7 @@ exports.signup = async (req, res, next) => {
     await createdUser.save();
   } catch (err) {
     const error = new HttpError(
-      'Signing up failed, please try again later.',
+      'Rejestracja nie powiodła się, spróbuj ponownie później.',
       500
     );
     return next(error);
@@ -97,7 +97,7 @@ exports.signup = async (req, res, next) => {
     token = jwt.sign({userId: createdUser.id, email: createdUser.email}, 'TOKEN_KEY', {expiresIn: '1h'})
   } catch (err) {
     const error = new HttpError(
-        'Signing up failed, please try again later.',
+        'Rejestracja nie powiodła się, spróbuj ponownie później.',
         500
       );
       return next(error);
@@ -116,7 +116,7 @@ exports.login = async (req, res, next) => {
     existingUser = await User.findOne({ email: email });
   } catch (err) {
     const error = new HttpError(
-      'Loggin in failed, please try again later.',
+      'Logowanie nie powiodło się, spróbuj ponownie później.',
       500
     );
     return next(error);
@@ -124,7 +124,7 @@ exports.login = async (req, res, next) => {
 
   if (!existingUser) {
     const error = new HttpError(
-      'Invalid credentials, could not log you in.',
+      'Nieprawidłowe dane logowania, nie można Cię zalogować.',
       401
     );
     return next(error);
@@ -134,13 +134,13 @@ exports.login = async (req, res, next) => {
   try {
     isValidPass = await bcrypt.compare(password, existingUser.password)
   } catch (err) {
-    const error = new HttpError('Could not log you in, check login inputs', 500)
+    const error = new HttpError('Nie można Cię zalogować, sprawdź dane logowania', 500)
     return next(error)
   }
 
   if (!isValidPass) {
     const error = new HttpError(
-        'Invalid credentials, could not log you in.',
+        'Nieprawidłowe dane logowania, nie można Cię zalogować.',
         401
       );
       return next(error);
@@ -151,7 +151,7 @@ exports.login = async (req, res, next) => {
     token = jwt.sign({userId: existingUser.id, email: existingUser.email}, 'TOKEN_KEY', {expiresIn: '1h'})
   } catch (err) {
     const error = new HttpError(
-        'Logging up failed, please try again later.',
+        'Logowanie nie powiodło się, spróbuj ponownie później.',
         500
       );
       return next(error);
@@ -176,7 +176,7 @@ exports.updateUser = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return next(
-      new HttpError('Invalid inputs passed, please check your data.', 422)
+      new HttpError('Nieprawidłowe dane wejściowe, sprawdź wprowadzone informacje.', 422)
     );
   }
 
@@ -188,7 +188,7 @@ exports.updateUser = async (req, res, next) => {
     user = await User.findById(userId);
   } catch (err) {
     const error = new HttpError(
-      'Something went wrong, could not update user.',
+      'Coś poszło nie tak, nie można zaktualizować użytkownika.',
       500
     );
     return next(error);
@@ -196,7 +196,7 @@ exports.updateUser = async (req, res, next) => {
 
   if (!user) {
     const error = new HttpError(
-      'Could not find user for this id.',
+      'Nie można znaleźć użytkownika o tym identyfikatorze.',
       404
     );
     return next(error);
@@ -215,7 +215,7 @@ exports.updateUser = async (req, res, next) => {
     await user.save();
   } catch (err) {
     const error = new HttpError(
-      'Something went wrong, could not update user.',
+      'Coś poszło nie tak, nie można zaktualizować użytkownika.',
       500
     );
     return next(error);
@@ -232,7 +232,7 @@ exports.getUserById = async (req, res, next) => {
     user = await User.findById(userId, '-password'); 
   } catch (err) {
     const error = new HttpError(
-      'Fetching user data failed, please try again later.',
+      'Pobieranie danych użytkownika nie powiodło się, spróbuj ponownie później.',
       500
     );
     return next(error);
@@ -240,7 +240,7 @@ exports.getUserById = async (req, res, next) => {
 
   if (!user) {
     const error = new HttpError(
-      'Could not find a user for the provided id.',
+      'Nie można znaleźć użytkownika o podanym identyfikatorze.',
       404
     );
     return next(error);
@@ -248,4 +248,3 @@ exports.getUserById = async (req, res, next) => {
 
   res.json({ user: user.toObject({ getters: true }) }); 
 };
-

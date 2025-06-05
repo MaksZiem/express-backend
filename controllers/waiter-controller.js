@@ -152,8 +152,105 @@ exports.getDishesDashboard = async (req, res, next) => {
   }
 };
 
+// exports.postCreateOrder = async (req, res, next) => {
+//   const { tableNumber } = req.body;
+
+//   try {
+//     const table = await Table.findOne({ number: tableNumber }).populate(
+//       "dishCart.items.dishId"
+//     );
+
+//     if (!table) {
+//       return res
+//         .status(404)
+//         .json({ message: "Stolik o podanym numerze nie istnieje." });
+//     }
+
+//     let order;
+//     if (table.order) {
+//       order = await Order.findById(table.order);
+//       if (!order) {
+//         return res.status(404).json({ message: "Zamówienie nie znalezione." });
+//       }
+//     } else {
+//       order = new Order({
+//         user: {
+//           name: req.user.name,
+//           userId: req.user,
+//         },
+//         dishes: [],
+//         price: 0,
+//         orderDate: new Date(),
+//         tableNumber: tableNumber,
+//       });
+
+//       table.order = order._id;
+//     }
+
+//     const newDishes = table.dishCart.items.filter(
+//       (item) => item.status === "notTaken"
+//     );
+//     if (newDishes.length === 0) {
+//       return res
+//         .status(400)
+//         .json({ message: "Brak nowych dań do dodania do zamówienia." });
+//     }
+
+//     newDishes.forEach((item) => {
+//       order.dishes.push({
+//         dish: { ...item.dishId._doc },
+//         quantity: item.quantity,
+//         status: "niegotowy",
+//       });
+//       table.dishCart.items.find((i) => i.dishId.equals(item.dishId)).status =
+//         "taken";
+//     });
+
+//     let finalPrices = order.price;
+//     newDishes.forEach((item) => {
+//       finalPrices += item.dishId.price * item.quantity;
+//     });
+
+//     order.price = finalPrices;
+
+//     table.status = "waiting";
+
+//     await order.save();
+//     await table.save();
+
+//     const io = req.app.get("io");
+//     io.emit("newOrder", {
+//       orderId: order._id,
+//       tableNumber: order.tableNumber,
+//       dishes: order.dishes.map((dishItem) => ({
+//         id: dishItem.dish._id,
+//         dishName: dishItem.dish.name,
+//         quantity: dishItem.quantity,
+//         status: dishItem.status,
+//       })),
+//       price: order.price,
+//       orderDate: order.orderDate,
+//     });
+
+//     io.emit("tableStatusChanged", {
+//       tableId: table._id,
+//       status: "waiting",
+//     });
+
+//     res.status(200).json({
+//       message: "Zamówienie zostało zaktualizowane.",
+//       order: order,
+//     });
+//   } catch (err) {
+//     console.log(err);
+//     res
+//       .status(500)
+//       .json({ message: "Wystąpił błąd podczas przetwarzania zamówienia." });
+//   }
+// };
+
 exports.postCreateOrder = async (req, res, next) => {
-  const { tableNumber } = req.body;
+  const { tableNumber, note } = req.body;
 
   try {
     const table = await Table.findOne({ number: tableNumber }).populate(
@@ -182,9 +279,15 @@ exports.postCreateOrder = async (req, res, next) => {
         price: 0,
         orderDate: new Date(),
         tableNumber: tableNumber,
+        note: note || "", // Add note field with default empty string
       });
 
       table.order = order._id;
+    }
+
+    // If order already exists and we have a new note, update it
+    if (note !== undefined && note !== null) {
+      order.note = note;
     }
 
     const newDishes = table.dishCart.items.filter(
@@ -212,7 +315,6 @@ exports.postCreateOrder = async (req, res, next) => {
     });
 
     order.price = finalPrices;
-
     table.status = "waiting";
 
     await order.save();
@@ -230,6 +332,7 @@ exports.postCreateOrder = async (req, res, next) => {
       })),
       price: order.price,
       orderDate: order.orderDate,
+      note: order.note, // Include note in the emitted data
     });
 
     io.emit("tableStatusChanged", {

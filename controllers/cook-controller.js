@@ -36,6 +36,7 @@ exports.getWaitingOrders = async (req, res, next) => {
       })),
       price: order.price,
       orderDate: order.orderDate,
+      note: order.note
     }));
 
     res.status(200).json({
@@ -394,17 +395,15 @@ exports.getCookPreparationTime = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid cook ID." });
     }
 
-    // Ustawienie startowej daty w zależności od okresu
+    // Ustawienie startowej daty w zależności od okresu (zgodne z getCookDishesCount)
     if (period === "tydzien") {
       startDate = new Date(today);
       startDate.setDate(today.getDate() - 6);
     } else if (period === "miesiac") {
-      startDate = new Date(today);
-      startDate.setDate(1);
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
     } else if (period === "rok") {
       startDate = new Date(today);
-      startDate.setFullYear(today.getFullYear() - 1);
-      startDate.setMonth(today.getMonth()); // Ustawienie na początek tego samego miesiąca
+      startDate.setMonth(today.getMonth() - 11);
       startDate.setDate(1);
     } else {
       return res.status(400).json({
@@ -441,7 +440,11 @@ exports.getCookPreparationTime = async (req, res, next) => {
     } else if (period === "rok") {
       preparationTime = Array(12).fill(0);
       labels = Array.from({ length: 12 }, (_, i) =>
-        new Date(today.getFullYear(), i, 1).toLocaleDateString("pl-PL", {
+        new Date(
+          today.getFullYear(),
+          (today.getMonth() + i + 1) % 12,
+          1
+        ).toLocaleDateString("pl-PL", {
           month: "short",
         })
       );
@@ -471,7 +474,8 @@ exports.getCookPreparationTime = async (req, res, next) => {
               preparationTime[dayIndex] += timeToPrepare;
             }
           } else if (period === "rok") {
-            const monthIndex = dateToCheck.getMonth();
+            
+            const monthIndex = (dateToCheck.getMonth() - startDate.getMonth() + 12) % 12;
             if (monthIndex >= 0 && monthIndex < preparationTime.length) {
               preparationTime[monthIndex] += timeToPrepare;
             }
@@ -480,51 +484,38 @@ exports.getCookPreparationTime = async (req, res, next) => {
       });
     });
 
-    const preparationTimeInMinutes = preparationTime.map((time) => {
-      const dishesPrepared = orders.filter((order) =>
-        order.dishes.some((dish) => {
-          const dateToCheck = new Date(dish.doneByCookDate);
-          if (period === "tydzien") {
-            const daysAgo = Math.floor(
-              (dateToCheck - startDate) / (1000 * 60 * 60 * 24)
-            );
-            return (
-              dish.preparedBy.toString() === cookId &&
-              daysAgo >= 0 &&
-              daysAgo < 7
-            );
-          } else if (period === "miesiac") {
-            const dayIndex = dateToCheck.getDate() - 1;
-            return (
-              dish.preparedBy.toString() === cookId &&
-              dayIndex >= 0 &&
-              dayIndex < preparationTime.length
-            );
-          } else if (period === "rok") {
-            const monthIndex = dateToCheck.getMonth();
-            return (
-              dish.preparedBy.toString() === cookId &&
-              monthIndex >= 0 &&
-              monthIndex < preparationTime.length
-            );
+    
+    const preparationTimeInMinutes = preparationTime.map((time, index) => {
+      let dishesCount = 0;
+
+      orders.forEach((order) => {
+        order.dishes.forEach((dish) => {
+          if (dish.preparedBy && dish.preparedBy.toString() === cookId) {
+            const dateToCheck = new Date(dish.doneByCookDate);
+            let shouldCount = false;
+
+            if (period === "tydzien") {
+              const daysAgo = Math.floor(
+                (dateToCheck - startDate) / (1000 * 60 * 60 * 24)
+              );
+              shouldCount = daysAgo === index;
+            } else if (period === "miesiac") {
+              const dayIndex = dateToCheck.getDate() - 1;
+              shouldCount = dayIndex === index;
+            } else if (period === "rok") {
+              const monthIndex = (dateToCheck.getMonth() - startDate.getMonth() + 12) % 12;
+              shouldCount = monthIndex === index;
+            }
+
+            if (shouldCount) {
+              dishesCount += dish.quantity || 1;
+            }
           }
-          return false;
-        })
-      ).length;
+        });
+      });
 
-      return dishesPrepared > 0
-        ? Math.round(time / (1000 * 60 * dishesPrepared))
-        : 0;
+      return dishesCount > 0 ? Math.round(time / (1000 * 60 * dishesCount)) : 0;
     });
-
-    // Dostosowanie dla okresu "rok": obrót tablic preparationTimeInMinutes i labels
-    if (period === "rok") {
-      const currentMonth = today.getMonth();
-      preparationTimeInMinutes.push(
-        ...preparationTimeInMinutes.splice(0, currentMonth + 1)
-      );
-      labels.push(...labels.splice(0, currentMonth + 1));
-    }
 
     res.status(200).json({
       labels,

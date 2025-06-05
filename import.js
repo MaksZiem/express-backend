@@ -4,12 +4,12 @@ const bcrypt = require("bcryptjs");
 
 async function importData() {
   const uri =
-    "mongodb+srv://maximilian:Johen2001@cluster0.pyphlw1.mongodb.net/restaurant2?retryWrites=true&w=majority";
+    "mongodb+srv://maximilian:Johen2001@cluster0.pyphlw1.mongodb.net/restaurant3?retryWrites=true&w=majority";
   const client = new MongoClient(uri);
 
   try {
     await client.connect();
-    const database = client.db("restaurant2");
+    const database = client.db("restaurant3");
     const collection = database.collection("IngredientCategories");
     const collection2 = database.collection("DishCategories");
     const ingredientTemplatesCollection = database.collection(
