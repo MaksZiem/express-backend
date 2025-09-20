@@ -1,3 +1,6 @@
+// Ładowanie zmiennych środowiskowych na początku
+require('dotenv').config();
+
 const express = require('express')
 const bodyParser = require('body-parser')
 const mongoose = require('mongoose')
@@ -22,8 +25,20 @@ const fs = require('fs')
 const { Server } = require('socket.io'); 
 const http = require('http'); 
 
-const MONGODB_URI =
-'mongodb+srv://maximilian:Johen2001@cluster0.pyphlw1.mongodb.net/restaurant4?retryWrites=true&w=majority'
+const MONGODB_URI = process.env.MONGODB_URI;
+const PORT = process.env.PORT || 8000;
+const WEBSOCKET_PORT = process.env.WEBSOCKET_PORT || 8001;
+const SESSION_SECRET = process.env.SESSION_SECRET || 'fallback-secret';
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
+
+if (!MONGODB_URI) {
+  console.error('BŁĄD: MONGODB_URI nie jest ustawione w zmiennych środowiskowych');
+  process.exit(1);
+}
+
+if (!SESSION_SECRET || SESSION_SECRET === 'fallback-secret') {
+  console.warn('OSTRZEŻENIE: SESSION_SECRET nie jest ustawiony lub używa wartości domyślnej');
+}
 
 const app = express();
 const store = new MongoDBStore({
@@ -34,7 +49,7 @@ const store = new MongoDBStore({
 const wsServer = http.createServer(); 
 const io = new Server(wsServer, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: CORS_ORIGIN,
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   },
@@ -49,22 +64,24 @@ app.get('/', (req, res) => {
   res.redirect('/auth');
 });
 
-// ???
 app.use(
   session({
-    secret: 'my secret',
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: store
+    store: store,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production', // HTTPS tylko w produkcji
+      maxAge: 1000 * 60 * 60 * 24 // 24 godziny
+    }
   })
 );
 
 app.use('/uploads/images', express.static(path.join('uploads', 'images')))
 
-
-// zeby nie bylo cors error
+// CORS middleware
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN)
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, PUT')
   next()
@@ -82,10 +99,6 @@ app.use('/api/statistics', statisticsRoutes)
 app.use('/api/statistics/orders', orderStatisticsRoutes)
 app.use('/api/statistics/dishes', dishStatisticsRoutes)
 app.use('/api/statistics/ingredients', ingredientStatisticsRoutes)
-
-
-
-
 
 app.use((req, res, next) => {
     const error = new HttpError('Could not find this route', 404)
@@ -105,8 +118,6 @@ app.use((error, req, res, next) => {
   res.json({ message: error.message || 'An unknown error occurred!' });
 });
 
-
-
 io.on('connection', (socket) => {
   console.log('Nowe połączenie WebSocket');
 
@@ -122,12 +133,14 @@ io.on('connection', (socket) => {
 mongoose
 .connect(MONGODB_URI)
 .then(()=> {
-      app.listen(8000);
+      app.listen(PORT, () => {
+        console.log(`Server uruchomiony na porcie ${PORT}`);
+      });
 })
 .catch(err => {
-    console.log(err)
+    console.log('Błąd połączenia z bazą danych:', err)
 }) 
 
-wsServer.listen(8001, () => {
-  console.log('WebSocket server is running on port 8001');
+wsServer.listen(WEBSOCKET_PORT, () => {
+  console.log(`WebSocket server is running on port ${WEBSOCKET_PORT}`);
 });
