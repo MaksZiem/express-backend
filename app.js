@@ -23,7 +23,7 @@ const { Server } = require('socket.io');
 const http = require('http'); 
 
 const MONGODB_URI =
-'mongodb+srv://maximilian:Johen2001@cluster0.pyphlw1.mongodb.net/restaurant3?retryWrites=true&w=majority'
+'mongodb+srv://maximilian:Johen2001@cluster0.pyphlw1.mongodb.net/restaurant4?retryWrites=true&w=majority'
 
 const app = express();
 const store = new MongoDBStore({
