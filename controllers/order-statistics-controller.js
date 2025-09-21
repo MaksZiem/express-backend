@@ -2,6 +2,7 @@ const Order = require("../models/order");
 const Dish = require("../models/dish");
 const User = require("../models/user");
 const Ingredient = require("../models/ingredient");
+const IngredientsWaste = require("../models/ingredientWaste")
 
 exports.getMostPopularDishes = (req, res, next) => {
   const today = new Date();
@@ -416,7 +417,7 @@ exports.getTotalProfit2 = async (req, res, next) => {
   }
 };
 
-exports.getTotalProfit = async (req, res, next) => {
+exports.getTotalProfit3 = async (req, res, next) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -499,6 +500,207 @@ exports.getTotalProfit = async (req, res, next) => {
         ) / relevantIngredients.length;
       
       ingredientPriceMap[name] = avgPriceRatio;
+    });
+
+    let totalProfit = 0;
+    let debugInfo = []; // dla debugowania
+
+    for (const order of recentOrders) {
+      for (const dishItem of order.dishes) {
+        const dish = dishMap[dishItem.dish._id];
+        if (!dish) {
+          console.warn(`Brak dania o ID: ${dishItem.dish._id}`);
+          continue;
+        }
+
+        const dishPrice = parseFloat(dish.price) || 0;
+        const quantity = parseInt(dishItem.quantity) || 0;
+        
+        if (dishPrice === 0) {
+          console.warn(`Brak ceny dla dania: ${dish.name || dish._id}`);
+        }
+        
+        if (quantity === 0) {
+          console.warn(`Brak ilości dla dania: ${dish.name || dish._id}`);
+        }
+
+        const ingredientTemplates = dish.ingredientTemplates || [];
+        let totalIngredientCost = 0;
+
+        for (const template of ingredientTemplates) {
+          const ingredient = template.ingredient;
+          if (!ingredient || !ingredient.name) {
+            console.warn(`Brak nazwy składnika w template`);
+            continue;
+          }
+
+          const avgPriceRatio = ingredientPriceMap[ingredient.name];
+          
+          if (avgPriceRatio === undefined) {
+            console.warn(`Brak avgPriceRatio dla składnika: ${ingredient.name}`);
+            continue;
+          }
+
+          const weightInDish = parseFloat(template.weight) || 0;
+          
+          if (weightInDish === 0) {
+            console.warn(`Brak wagi dla składnika: ${ingredient.name} w daniu: ${dish.name}`);
+          }
+
+          const ingredientCostForDish = avgPriceRatio * weightInDish;
+          
+          if (isNaN(ingredientCostForDish)) {
+            console.error(`NaN wykryty dla składnika ${ingredient.name}:`, {
+              avgPriceRatio,
+              weightInDish,
+              template: template
+            });
+            continue;
+          }
+
+          totalIngredientCost += ingredientCostForDish;
+        }
+
+        const dishProfit = (dishPrice - totalIngredientCost) * quantity;
+        
+        if (isNaN(dishProfit)) {
+          console.error(`NaN wykryty dla zysku dania:`, {
+            dishName: dish.name,
+            dishPrice,
+            totalIngredientCost,
+            quantity,
+            dishProfit
+          });
+          continue;
+        }
+
+        debugInfo.push({
+          dishName: dish.name,
+          dishPrice,
+          totalIngredientCost,
+          quantity,
+          dishProfit
+        });
+
+        totalProfit += dishProfit;
+      }
+    }
+
+    console.log("Informacje debug:", debugInfo);
+    console.log("Całkowity zysk:", totalProfit);
+
+    // Sprawdzenie czy totalProfit to NaN
+    if (isNaN(totalProfit)) {
+      console.error("BŁĄD: totalProfit to NaN");
+      return res.status(500).json({
+        message: "Błąd obliczeń - wynik to NaN",
+        debugInfo: debugInfo
+      });
+    }
+
+    return res.status(200).json({
+      message: `Całkowity zysk w ostatnim okresie: ${period}`,
+      totalProfit: totalProfit.toFixed(2),
+    });
+  } catch (err) {
+    console.log("Błąd:", err);
+    return res
+      .status(500)
+      .json({ message: "Wystąpił błąd podczas obliczania zysku." });
+  }
+};
+
+exports.getTotalProfit = async (req, res, next) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    console.log("procenty");
+    let startDate;
+    const period = req.body.periodPercentage || "tydzien";
+
+    if (period === "tydzien") {
+      startDate = new Date(today);
+      startDate.setDate(today.getDate() - 6);
+    } else if (period === "miesiac") {
+      startDate = new Date(today);
+      startDate.setDate(1);
+    } else if (period === "rok") {
+      startDate = new Date(today);
+      startDate.setMonth(today.getMonth() - 11);
+      startDate.setDate(1);
+    } else {
+      return res.status(400).json({
+        message: "Invalid period. Choose 'tydzien', 'miesiac', or 'rok'.",
+      });
+    }
+
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const recentOrders = await Order.find({
+      orderDate: { $gte: startDate, $lt: endOfToday },
+    });
+
+    console.log(
+      `Znalezione zamówienia z okresu '${period}':`,
+      recentOrders.length
+    );
+
+    const dishIds = [
+      ...new Set(
+        recentOrders.flatMap((order) =>
+          order.dishes.map((dishItem) => dishItem.dish._id)
+        )
+      ),
+    ];
+    const dishes = await Dish.find({ _id: { $in: dishIds } });
+
+    const dishMap = {};
+    dishes.forEach((dish) => {
+      dishMap[dish._id] = dish;
+    });
+
+    const ingredientNames = [
+      ...new Set(
+        dishes.flatMap((dish) =>
+          dish.ingredientTemplates.map((template) => template.ingredient.name)
+        )
+      ),
+    ];
+
+    // Pobierz składniki z obu kolekcji
+    const [ingredients, ingredientsWaste] = await Promise.all([
+      Ingredient.find({ name: { $in: ingredientNames } }),
+      IngredientsWaste.find({ name: { $in: ingredientNames } })
+    ]);
+
+    const ingredientPriceMap = {};
+    ingredientNames.forEach((name) => {
+      // Połącz składniki z obu kolekcji
+      const relevantIngredients = [
+        ...ingredients.filter((ingredient) => ingredient.name === name),
+        ...ingredientsWaste.filter((ingredient) => ingredient.name === name)
+      ];
+
+      if (relevantIngredients.length === 0) {
+        console.warn(`Brak składnika: ${name} - ustawiam priceRatio na 0`);
+        ingredientPriceMap[name] = 0;
+        return;
+      }
+
+      const avgPriceRatio =
+        relevantIngredients.reduce(
+          (sum, ingredient) => {
+            const priceRatio = parseFloat(ingredient.priceRatio) || 0;
+            return sum + priceRatio;
+          },
+          0
+        ) / relevantIngredients.length;
+      
+      ingredientPriceMap[name] = avgPriceRatio;
+      
+      // Debug info - pokaż z których kolekcji pochodzą składniki
+      console.log(`Składnik ${name}: znaleziono ${ingredients.filter(i => i.name === name).length} w Ingredients i ${ingredientsWaste.filter(i => i.name === name).length} w IngredientsWaste, średni priceRatio: ${avgPriceRatio}`);
     });
 
     let totalProfit = 0;
