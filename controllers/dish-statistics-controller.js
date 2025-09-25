@@ -5,6 +5,7 @@ const Ingredient = require("../models/ingredient");
 const IngredientTemplate = require("../models/ingredientTemplate");
 const mongoose = require("mongoose");
 const HttpError = require("../models/http-error");
+const IngredientsWaste = require('../models/ingredientWaste')
 
 exports.getDishRevenueByPeriod = async (req, res, next) => {
   const dishId = req.params.dishId;

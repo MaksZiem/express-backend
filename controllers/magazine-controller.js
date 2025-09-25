@@ -32,7 +32,7 @@ exports.getAllIngredientTemplates = (req, res, next) => {
 };
 
 
-exports.getIngredientsByName = async (req, res, next) => {
+exports.getIngredientsByName2509 = async (req, res, next) => {
   const ingredientName = req.params.name;
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -95,6 +95,87 @@ exports.getIngredientsByName = async (req, res, next) => {
   }
 };
 
+exports.getIngredientsByName = async (req, res, next) => {
+  const ingredientName = req.params.name;
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+  try {
+    // Pobierz składniki z tabeli Ingredient
+    const ingredients = await Ingredient.find({
+      name: ingredientName,
+      addedDate: { $gte: oneYearAgo },
+    }).sort({ expirationDate: -1 });
+
+    // Pobierz składniki z tabeli IngredientsWaste
+    const wastedIngredients = await IngredientWaste.find({
+      name: ingredientName,
+      addedDate: { $gte: oneYearAgo },
+    }).sort({ expirationDate: -1 });
+
+    // Połącz wszystkie składniki do obliczenia średniej
+    const allIngredients = [...ingredients, ...wastedIngredients];
+
+    if (allIngredients.length === 0) {
+      return res.status(404).json({
+        message:
+          "Nie znaleziono żadnych składników o podanej nazwie w ciągu ostatnich 365 dni.",
+      });
+    }
+
+    let totalDaysToExpire = 0;
+    allIngredients.forEach((ingredient) => {
+      const expirationDate = new Date(ingredient.expirationDate).getTime();
+      const addedDate = new Date(ingredient.addedDate).getTime();
+      const daysToExpire = (expirationDate - addedDate) / (1000 * 60 * 60 * 24);
+      totalDaysToExpire += daysToExpire;
+    });
+
+    const averageDaysToExpire = totalDaysToExpire / allIngredients.length;
+    
+    // Używamy 'let', aby móc modyfikować predictedExpirationDate
+    let predictedExpirationDate = new Date();
+    predictedExpirationDate.setDate(
+      predictedExpirationDate.getDate() + averageDaysToExpire
+    );
+
+    // Jeśli predictedExpirationDate jest w przeszłości, ustawiamy na dzisiejszą datę
+    const today = new Date();
+    if (predictedExpirationDate < today) {
+      predictedExpirationDate = today;
+    }
+
+    const formattedExpirationDate = `${predictedExpirationDate
+      .getDate()
+      .toString()
+      .padStart(2, "0")}.${(predictedExpirationDate.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}.${predictedExpirationDate.getFullYear()}`;
+
+    res.status(200).json({
+      predictedExpirationDate: formattedExpirationDate,
+      // Zwracamy tylko składniki z tabeli Ingredient (nie zmarnowane)
+      ingredients: ingredients.map((ingredient) => ({
+        ...ingredient.toObject({ getters: true }),
+        expirationDate: ingredient.expirationDate
+          .toISOString()
+          .slice(0, 10),
+      })),
+      // Opcjonalnie: dodatkowe informacje o danych użytych do obliczeń
+      calculationData: {
+        totalIngredientsUsed: allIngredients.length,
+        currentIngredients: ingredients.length,
+        wastedIngredients: wastedIngredients.length,
+        averageDaysToExpire: Math.round(averageDaysToExpire * 100) / 100
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    return next(
+      new HttpError("Wystąpił błąd podczas pobierania składników.", 500)
+    );
+  }
+};
 
 exports.createIngredientTemplate = async (req, res, next) => {
   const errors = validationResult(req);

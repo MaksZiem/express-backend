@@ -2,14 +2,18 @@ const { MongoClient } = require("mongodb");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
+require('dotenv').config();
+
+const DATABASE_NAME = process.env.DATABASE_NAME;
+const MONGODB_URI = process.env.MONGODB_URI;
+
 async function importData() {
-  const uri =
-    "mongodb+srv://maximilian:Johen2001@cluster0.pyphlw1.mongodb.net/restaurant4?retryWrites=true&w=majority";
+  const uri = MONGODB_URI
   const client = new MongoClient(uri);
 
   try {
     await client.connect();
-    const database = client.db("restaurant4");
+    const database = client.db(DATABASE_NAME);
     const collection = database.collection("IngredientCategories");
     const collection2 = database.collection("DishCategories");
     const ingredientTemplatesCollection = database.collection(
@@ -21,6 +25,7 @@ async function importData() {
     const ordersCollection = database.collection("Orders");
     const tipCollection = database.collection("Tips");
     const tablesCollection = database.collection("Tables");
+    const ingredientWasteCollection = database.collection("ingredient-wastes");
 
     const ingredientCategories = [
       { name: "wszystkie" },
@@ -768,6 +773,27 @@ async function importData() {
       },
     ];
 
+    // Dodaj po definicji detailedIngredients:
+const ingredientWaste = ingredients.flatMap((template) => {
+  const count = Math.floor(Math.random() * 3) + 1; // od 1 do 3 rekordów
+  return Array.from({ length: count }, () => {
+    const weight = Math.floor(Math.random() * 400) + 50; // 50-450g
+    const price = parseFloat((Math.random() * 15 + 2).toFixed(2)); // 2-17 zł
+    const daysAgo = Math.floor(Math.random() * 15) + 3; // 3-18 dni temu dodane
+    const expiredDaysAgo = Math.floor(Math.random() * 10) + 1; // przeterminowane 1-10 dni temu
+    
+    return {
+      name: template.name,
+      price: price,
+      weight: weight,
+      addedDate: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+      expirationDate: new Date(Date.now() - expiredDaysAgo * 24 * 60 * 60 * 1000),
+      category: template.category,
+      priceRatio: parseFloat((price / weight).toFixed(2)),
+    };
+  });
+});
+
     const hashPasswords = async (users) => {
       const updatedUsers = [];
 
@@ -881,6 +907,9 @@ async function importData() {
     const detailedIngredientInsertResult = await ingredientsCollection.insertMany(detailedIngredients);
     const dishInsertResult = await dishesCollection.insertMany(dishes);
     const tablesInsertResult = await tablesCollection.insertMany(tables);
+    const ingredientWasteInsertResult = await ingredientWasteCollection.insertMany(ingredientWaste);
+
+
 
     console.log(
       `${dishCategoriesResult.insertedCount} kategorii dan zaimportowano.`
@@ -903,6 +932,7 @@ async function importData() {
     console.log(
       `${tablesInsertResult.insertedCount} stolow zostało zaimportowanych.`
     );
+    console.log(`${ingredientWasteInsertResult.insertedCount} składników odpadowych zaimportowano.`);
   } finally {
     await client.close();
   }

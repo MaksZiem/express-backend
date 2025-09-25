@@ -3,7 +3,7 @@ const Order = require("../models/order");
 const Table = require("../models/table");
 const mongoose = require("mongoose");
 
-exports.getWaitingOrders = async (req, res, next) => {
+exports.getWaitingOrders2 = async (req, res, next) => {
   try {
     const tablesWithWaitingOrders = await Table.find({
       status: "waiting",
@@ -38,6 +38,60 @@ exports.getWaitingOrders = async (req, res, next) => {
       orderDate: order.orderDate,
       note: order.note
     }));
+
+    res.status(200).json({
+      message: "Znaleziono zamówienia w statusie 'waiting'.",
+      orders: ordersWithDishStatus,
+    });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ message: "Wystąpił błąd podczas pobierania zamówień." });
+  }
+};
+
+exports.getWaitingOrders = async (req, res, next) => {
+  try {
+    const tablesWithWaitingOrders = await Table.find({
+      status: "waiting",
+    }).populate({
+      path: "order",
+      populate: {
+        path: "dishes.dish",
+        model: "Dish",
+      },
+    });
+
+    if (!tablesWithWaitingOrders || tablesWithWaitingOrders.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Nie znaleziono zamówień w statusie 'waiting'." });
+    }
+
+    const waitingOrders = tablesWithWaitingOrders
+      .map((table) => table.order)
+      .filter((order) => order !== null);
+
+    // Filtruj zamówienia - pokaż tylko te, które mają przynajmniej jedno danie nie wydane
+    const ordersWithDishStatus = waitingOrders
+      .map((order) => ({
+        orderId: order._id,
+        tableNumber: order.tableNumber,
+        dishes: order.dishes.map((dishItem) => ({
+          id: dishItem.dish._id,
+          dishName: dishItem.dish.name,
+          quantity: dishItem.quantity,
+          status: dishItem.status,
+        })),
+        price: order.price,
+        orderDate: order.orderDate,
+        note: order.note
+      }))
+      .filter((order) => {
+        // Pokaż tylko zamówienia, które mają przynajmniej jedno danie nie wydane
+        return order.dishes.some(dish => dish.status !== "wydane");
+      });
 
     res.status(200).json({
       message: "Znaleziono zamówienia w statusie 'waiting'.",
@@ -529,7 +583,7 @@ exports.getCookPreparationTime = async (req, res, next) => {
   }
 };
 
-exports.getDishesPreparedByCook = async (req, res, next) => {
+exports.getDishesPreparedByCookbezdebugu = async (req, res, next) => {
   const cookId = req.params.cookId;
   const { startDate, endDate, dishId } = req.body;
 
@@ -595,6 +649,144 @@ exports.getDishesPreparedByCook = async (req, res, next) => {
     });
   } catch (err) {
     console.error("Error retrieving dishes prepared by cook:", err);
+    res
+      .status(500)
+      .json({ message: "An error occurred while retrieving dishes." });
+  }
+};
+
+exports.getDishesPreparedByCook = async (req, res, next) => {
+  console.log("=== DEBUG getDishesPreparedByCook START ===");
+  
+  const cookId = req.params.cookId;
+  const { startDate, endDate, dishId } = req.body;
+  
+  console.log("Input parameters:");
+  console.log("- cookId from params:", cookId);
+  console.log("- cookId type:", typeof cookId);
+  console.log("- startDate:", startDate);
+  console.log("- endDate:", endDate);
+  console.log("- dishId:", dishId);
+  console.log("- req.params:", JSON.stringify(req.params));
+  console.log("- req.body:", JSON.stringify(req.body));
+
+  // Walidacja cookId
+  if (!cookId || cookId === 'undefined' || cookId === undefined) {
+    console.log("❌ ERROR: cookId is missing or undefined");
+    return res.status(400).json({ message: "Cook ID is required." });
+  }
+
+  // Sprawdź czy cookId jest prawidłowym ObjectId
+  const mongoose = require('mongoose');
+  if (!mongoose.Types.ObjectId.isValid(cookId)) {
+    console.log("❌ ERROR: cookId is not a valid ObjectId format");
+    return res.status(400).json({ message: "Invalid Cook ID format." });
+  }
+
+  console.log("✅ cookId validation passed");
+
+  try {
+    let dateFilter = {};
+    if (startDate && endDate) {
+      console.log("Processing date filter...");
+      try {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        
+        console.log("- start date:", start);
+        console.log("- end date:", end);
+        
+        dateFilter = { $gte: start, $lte: end };
+        console.log("- dateFilter:", dateFilter);
+      } catch (err) {
+        console.log("❌ ERROR: Invalid date format:", err.message);
+        return res.status(400).json({ message: "Invalid date format." });
+      }
+    } else {
+      console.log("No date filter applied");
+    }
+
+    // Query object dla debugowania
+    const queryObject = {
+      "dishes.preparedBy": cookId,
+      ...(startDate && endDate && { "dishes.doneByCookDate": dateFilter }),
+    };
+    
+    console.log("MongoDB query object:", JSON.stringify(queryObject, null, 2));
+
+    console.log("Executing MongoDB query...");
+    const orders = await Order.find(queryObject).populate({
+      path: "dishes.dish",
+      model: Dish,
+    });
+
+    console.log(`Found ${orders.length} orders`);
+    console.log("Orders preview:", orders.map(order => ({
+      id: order._id,
+      orderDate: order.orderDate,
+      dishesCount: order.dishes.length
+    })));
+
+    console.log("Processing dishes...");
+    const dishesPreparedByCook = orders.flatMap((order, orderIndex) => {
+      console.log(`Processing order ${orderIndex + 1}/${orders.length} (ID: ${order._id})`);
+      
+      return order.dishes
+        .filter((dish, dishIndex) => {
+          const preparedByMatch = dish.preparedBy && dish.preparedBy.toString() === cookId;
+          const dateMatch = !startDate || 
+            (dish.doneByCookDate >= new Date(startDate) && 
+             dish.doneByCookDate <= new Date(endDate));
+          
+          console.log(`  Dish ${dishIndex + 1}: preparedBy=${dish.preparedBy}, match=${preparedByMatch}, dateMatch=${dateMatch}`);
+          
+          return preparedByMatch && dateMatch;
+        })
+        .map((dish, mappedIndex) => {
+          console.log(`  Mapping dish ${mappedIndex + 1}`);
+          
+          const orderDate = new Date(order.orderDate);
+          const doneByCookDate = new Date(dish.doneByCookDate);
+          const cookingTime = (doneByCookDate - orderDate) / 1000;
+
+          const mappedDish = {
+            orderId: order._id,
+            orderDate: order.orderDate,
+            tableNumber: order.tableNumber,
+            dishName: dish.dish.name,
+            quantity: dish.quantity,
+            status: dish.status,
+            price: order.price,
+            cookingTime: Math.max(0, cookingTime),
+          };
+          
+          console.log(`  Mapped dish:`, mappedDish);
+          return mappedDish;
+        });
+    });
+
+    console.log(`Total dishes prepared by cook: ${dishesPreparedByCook.length}`);
+
+    if (dishesPreparedByCook.length === 0) {
+      console.log("❌ No dishes found for this cook");
+      return res
+        .status(404)
+        .json({ message: "No dishes found for this cook." });
+    }
+
+    console.log("✅ SUCCESS: Returning dishes");
+    console.log("=== DEBUG getDishesPreparedByCook END ===");
+    
+    res.status(200).json({
+      message: `Found ${dishesPreparedByCook.length} dishes prepared by the cook.`,
+      dishes: dishesPreparedByCook,
+    });
+  } catch (err) {
+    console.error("❌ ERROR in getDishesPreparedByCook:", err);
+    console.error("Error stack:", err.stack);
+    console.log("=== DEBUG getDishesPreparedByCook ERROR END ===");
+    
     res
       .status(500)
       .json({ message: "An error occurred while retrieving dishes." });
